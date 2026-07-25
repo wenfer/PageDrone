@@ -1,0 +1,30 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+*.zip
+!releases/.gitkeep
+
+# Local / secrets
+.env
+.env.*
+*.local
+.claude/
+.cursor/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Chrome extension packaging temp
+/tmp/
+package/
+.output/

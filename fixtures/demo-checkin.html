@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>签到演示页</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 480px;
+        margin: 40px auto;
+        padding: 24px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+      }
+      button {
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #94a3b8;
+        cursor: default;
+      }
+      #msg {
+        margin-top: 16px;
+        color: #166534;
+        font-weight: 600;
+        min-height: 1.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>本地签到演示</h1>
+    <p>用于测试扩展：步骤模式点击下方按钮即可。</p>
+    <button class="checkin" id="btn">立即签到</button>
+    <div id="msg"></div>
+    <script>
+      const btn = document.getElementById('btn');
+      const msg = document.getElementById('msg');
+      const key = 'demo-checked-' + new Date().toDateString();
+      if (localStorage.getItem(key)) {
+        btn.disabled = true;
+        btn.textContent = '今日已签到';
+        msg.textContent = '已签到';
+      }
+      btn.addEventListener('click', () => {
+        localStorage.setItem(key, '1');
+        btn.disabled = true;
+        btn.textContent = '今日已签到';
+        msg.textContent = '签到成功';
+      });
+    </script>
+  </body>
+</html>

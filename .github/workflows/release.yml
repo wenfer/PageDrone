@@ -1,0 +1,115 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v 前缀，如 1.0.2）。留空则读取 manifest.json'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION#v}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          fi
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version=${VERSION} tag=${TAG}"
+
+      - name: Sync manifest version (tag/manual)
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          python3 - <<'PY'
+          import json, os
+          path = "manifest.json"
+          with open(path, "r", encoding="utf-8") as f:
+              data = json.load(f)
+          data["version"] = os.environ["VERSION"]
+          with open(path, "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+          print("manifest version ->", data["version"])
+          PY
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+
+      - name: Package extension zip
+        id: pack
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          OUT_DIR="dist"
+          NAME="auto-checkin-v${VERSION}"
+          ZIP_NAME="${NAME}.zip"
+          mkdir -p "$OUT_DIR" "$OUT_DIR/$NAME"
+
+          # 仅打包扩展运行所需文件
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'dist' \
+            --exclude 'node_modules' \
+            --exclude '.claude' \
+            --exclude '.gitignore' \
+            --exclude '*.md' \
+            --exclude 'fixtures' \
+            ./ "$OUT_DIR/$NAME/"
+
+          # README 可选附带
+          if [ -f README.md ]; then
+            cp README.md "$OUT_DIR/$NAME/"
+          fi
+
+          (
+            cd "$OUT_DIR"
+            zip -r "$ZIP_NAME" "$NAME" -x "*.DS_Store"
+          )
+
+          echo "zip_path=dist/${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+          ls -lh "dist/${ZIP_NAME}"
+          unzip -l "dist/${ZIP_NAME}" | head -50
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Release ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ steps.pack.outputs.zip_path }}
+          body: |
+            ## 自动签到助手 ${{ steps.ver.outputs.tag }}
+
+            ### 安装
+            1. 下载附件 `${{ steps.pack.outputs.zip_name }}` 并解压
+            2. Chrome 打开 `chrome://extensions`
+            3. 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压后的文件夹
+
+            ### 说明
+            - Manifest V3 Chrome 扩展
+            - 支持可视化步骤 / 自定义脚本、Cloudflare 等待、OAuth 登录流、定时签到
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

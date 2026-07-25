@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>自动签到助手 - 设置</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="../icons/icon48.png" alt="" width="28" height="28" />
+          <div>
+            <strong>自动签到助手</strong>
+            <div class="sub">设置与站点管理</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-tab="sites">站点管理</button>
+          <button class="nav-item" data-tab="logs">签到日志</button>
+          <button class="nav-item" data-tab="settings">全局设置</button>
+          <button class="nav-item" data-tab="io">导入 / 导出</button>
+        </nav>
+        <div class="sidebar-foot">
+          <button id="btnRunAll" class="btn primary block">全部签到</button>
+          <button id="btnStop" class="btn danger-outline block">强制停止</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <!-- 站点 -->
+        <section id="tab-sites" class="tab active">
+          <div class="toolbar">
+            <h2>站点管理</h2>
+            <div class="toolbar-actions">
+              <button id="btnNewSite" class="btn primary">＋ 新建站点</button>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="panel list-panel">
+              <div class="panel-title">我的站点</div>
+              <div id="siteList" class="site-list"></div>
+            </div>
+
+            <div class="editor-wrap">
+              <div id="editorEmpty" class="empty-hint panel">
+                选择左侧站点进行编辑，或点击「新建站点」
+              </div>
+
+              <form id="siteForm" class="site-form hidden">
+                <!-- ① 基本信息 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">1</span>
+                    <div>
+                      <h3>基本信息</h3>
+                      <p>站点名称与要打开的签到地址</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="field">
+                      <label for="f-name">名称</label>
+                      <input id="f-name" name="name" required placeholder="例如：某论坛每日签到" />
+                    </div>
+                    <div class="field">
+                      <label for="f-url">签到页面网址</label>
+                      <input id="f-url" name="url" required type="url" placeholder="https://example.com/checkin" />
+                    </div>
+                    <div class="checks">
+                      <label class="check"><input name="enabled" type="checkbox" checked /> 启用此站点</label>
+                      <label class="check"><input name="openInBackground" type="checkbox" checked /> 后台打开标签</label>
+                      <label class="check"><input name="keepTabOnError" type="checkbox" checked /> 失败时保留标签</label>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ② 签到动作 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">2</span>
+                    <div>
+                      <h3>签到动作</h3>
+                      <p>用步骤模拟点击，或写自定义脚本</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="mode-switch" id="modeSeg">
+                      <label class="mode-opt">
+                        <input type="radio" name="mode" value="steps" checked />
+                        <span>可视化步骤</span>
+                      </label>
+                      <label class="mode-opt">
+                        <input type="radio" name="mode" value="script" />
+                        <span>自定义脚本</span>
+                      </label>
+                    </div>
+
+                    <div id="stepsBlock" class="mode-block">
+                      <div class="section-toolbar">
+                        <span class="section-label">执行步骤（按顺序）</span>
+                        <div class="section-actions">
+                          <button type="button" id="btnToggleHelp" class="btn ghost sm">使用说明</button>
+                          <button type="button" id="btnLoadExample" class="btn ghost sm">填入示例</button>
+                          <button type="button" id="btnAddStep" class="btn sm">＋ 添加步骤</button>
+                        </div>
+                      </div>
+
+                      <details class="help-panel" id="stepsHelp">
+                        <summary>如何填写步骤？点开查看</summary>
+                        <div class="help-body">
+                          <p>扩展会按顺序操作网页。最常见只需 <strong>2 步</strong>：</p>
+                          <ol>
+                            <li><strong>点击元素</strong> — 填签到按钮的选择器（CSS 或 XPath）</li>
+                            <li><strong>等待文字出现</strong> — 附加栏填「签到成功」等提示语</li>
+                          </ol>
+                          <p><strong>复制选择器：</strong>网页按 F12 → 选中按钮 → 右键 HTML → Copy → Copy selector 或 Copy XPath，粘贴到「目标」框。</p>
+                          <p>支持 CSS（如 <code>.checkin</code>）和 XPath（如 <code>//button[contains(.,"签到")]</code>）。</p>
+                        </div>
+                      </details>
+
+                      <div id="stepsList" class="steps-list"></div>
+                    </div>
+
+                    <div id="scriptBlock" class="mode-block hidden">
+                      <div class="section-toolbar">
+                        <span class="section-label">脚本内容</span>
+                        <button type="button" id="btnResetScript" class="btn ghost sm">恢复模板</button>
+                      </div>
+                      <textarea name="script" rows="12" spellcheck="false" class="code"></textarea>
+                      <p class="hint">需 <code>return { ok, message }</code>，支持 async/await。无法使用 chrome.* API。</p>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ③ 结果判定 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">3</span>
+                    <div>
+                      <h3>结果判定</h3>
+                      <p>根据页面文字判断签到是否成功（可选）</p>
+                    </div>
+                  </header>
+                  <div class="card-body grid-2">
+                    <div class="field">
+                      <label>成功关键词（逗号分隔）</label>
+                      <input name="successKeywords" placeholder="签到成功,已签到" />
+                    </div>
+                    <div class="field">
+                      <label>失败关键词（逗号分隔）</label>
+                      <input name="failKeywords" placeholder="失败,未登录" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ④ 定时 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">4</span>
+                    <div>
+                      <h3>定时签到</h3>
+                      <p>每天固定时间自动执行</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <label class="check big">
+                      <input name="scheduleEnabled" type="checkbox" /> 开启每日自动签到
+                    </label>
+                    <div class="time-row">
+                      <span class="time-label">执行时间</span>
+                      <input name="scheduleHour" type="number" min="0" max="23" value="8" class="time-input" />
+                      <span class="time-colon">:</span>
+                      <input name="scheduleMinute" type="number" min="0" max="59" value="5" class="time-input" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ⑤ 登录 / OAuth（折叠） -->
+                <section class="card card-muted">
+                  <header class="card-head">
+                    <span class="card-num">5</span>
+                    <div>
+                      <h3>登录 / OAuth <span class="tag">可选</span></h3>
+                      <p>需要先跳转第三方登录时再配置</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <label class="check big">
+                      <input name="loginEnabled" type="checkbox" id="loginEnabled" /> 启用登录流程
+                    </label>
+                    <div id="loginFields" class="login-fields">
+                      <p class="hint">
+                        未检测到「已登录」标记时，先执行登录步骤，再签到。
+                        首次 OAuth 通常需人工点一次授权。
+                      </p>
+                      <div class="grid-2">
+                        <div class="field">
+                          <label>已登录标记（CSS / XPath）</label>
+                          <input name="loggedInSelector" placeholder=".avatar  或  //img[contains(@class,'avatar')]" />
+                        </div>
+                        <div class="field">
+                          <label>已登录 URL 包含</label>
+                          <input name="loggedInUrlIncludes" placeholder="/dashboard" />
+                        </div>
+                      </div>
+                      <div class="field field-narrow">
+                        <label>登录超时（毫秒）</label>
+                        <input name="loginTimeoutMs" type="number" min="10000" step="1000" value="180000" />
+                      </div>
+                      <div class="section-toolbar">
+                        <span class="section-label">登录步骤</span>
+                        <button type="button" id="btnAddLoginStep" class="btn sm">＋ 添加</button>
+                      </div>
+                      <div id="loginStepsList" class="steps-list"></div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ⑥ 高级超时 -->
+                <section class="card card-muted">
+                  <header class="card-head">
+                    <span class="card-num">6</span>
+                    <div>
+                      <h3>超时设置 <span class="tag">高级</span></h3>
+                      <p>一般保持默认即可</p>
+                    </div>
+                  </header>
+                  <div class="card-body grid-2">
+                    <div class="field">
+                      <label>防护 / CF 等待（毫秒）</label>
+                      <input name="cfTimeoutMs" type="number" min="5000" step="1000" />
+                    </div>
+                    <div class="field">
+                      <label>页面加载超时（毫秒）</label>
+                      <input name="pageLoadTimeoutMs" type="number" min="5000" step="1000" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- 底部操作栏 -->
+                <div class="form-footer">
+                  <div class="form-footer-left">
+                    <button type="submit" class="btn primary lg">保存</button>
+                    <button type="button" id="btnTestSite" class="btn lg">立即测试签到</button>
+                  </div>
+                  <button type="button" id="btnDeleteSite" class="btn danger ghost">删除站点</button>
+                </div>
+                <p id="formMsg" class="form-msg"></p>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- 日志 -->
+        <section id="tab-logs" class="tab">
+          <div class="toolbar">
+            <h2>签到日志</h2>
+            <div class="toolbar-actions">
+              <button id="btnClearLogs" class="btn danger">清空日志</button>
+            </div>
+          </div>
+          <div id="logTable" class="log-table panel"></div>
+        </section>
+
+        <!-- 设置 -->
+        <section id="tab-settings" class="tab">
+          <div class="toolbar"><h2>全局设置</h2></div>
+          <form id="settingsForm" class="settings-form card">
+            <div class="card-body stack">
+              <label class="check big"><input name="notifyOnComplete" type="checkbox" /> 全部完成后通知</label>
+              <label class="check big"><input name="notifyOnError" type="checkbox" /> 失败 / 需验证时通知</label>
+              <label class="check big"><input name="openInBackground" type="checkbox" /> 默认后台打开标签</label>
+              <div class="grid-2">
+                <div class="field">
+                  <label>站点间隔（毫秒）</label>
+                  <input name="siteGapMs" type="number" min="0" step="500" />
+                </div>
+                <div class="field">
+                  <label>日志最多保留条数</label>
+                  <input name="maxLogs" type="number" min="20" max="2000" />
+                </div>
+                <div class="field">
+                  <label>默认 CF 超时（毫秒）</label>
+                  <input name="defaultCfTimeoutMs" type="number" min="5000" step="1000" />
+                </div>
+                <div class="field">
+                  <label>人机验证宽限（毫秒）</label>
+                  <input name="cfManualGraceMs" type="number" min="0" step="1000" />
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn primary lg">保存设置</button>
+              </div>
+              <p id="settingsMsg" class="form-msg"></p>
+            </div>
+          </form>
+        </section>
+
+        <!-- 导入导出 -->
+        <section id="tab-io" class="tab">
+          <div class="toolbar"><h2>导入 / 导出</h2></div>
+          <div class="io-grid">
+            <div class="card">
+              <div class="card-body">
+                <h3>导出</h3>
+                <p class="hint">导出全部站点配置、全局设置与日志为 JSON。</p>
+                <button id="btnExport" class="btn primary">导出 JSON</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <h3>导入</h3>
+                <p class="hint">默认按站点 id 合并；勾选后替换全部站点。</p>
+                <label class="check"><input id="importReplace" type="checkbox" /> 替换现有站点（不合并）</label>
+                <div class="io-row">
+                  <input id="importFile" type="file" accept="application/json,.json" />
+                  <button id="btnImport" class="btn">导入</button>
+                </div>
+                <p id="ioMsg" class="form-msg"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="stepTpl">
+      <div class="step-item">
+        <div class="step-index"></div>
+        <div class="step-body">
+          <div class="step-row">
+            <label class="step-field step-field-type">
+              <span class="step-field-label">动作</span>
+              <select class="step-type">
+                <option value="click">点击元素</option>
+                <option value="waitForText">等待文字出现</option>
+                <option value="waitFor">等待元素出现</option>
+                <option value="wait">固定等待</option>
+                <option value="type">输入文本</option>
+                <option value="goto">跳转到网址</option>
+                <option value="waitForUrl">等待地址栏变化</option>
+                <option value="manual">暂停·人工操作</option>
+              </select>
+            </label>
+            <label class="step-field step-field-main">
+              <span class="step-field-label step-label-main">目标（CSS / XPath）</span>
+              <input class="step-selector" placeholder="例如 .checkin 或 //button[contains(.,'签到')]" />
+            </label>
+            <label class="step-field step-field-extra">
+              <span class="step-field-label step-label-extra">附加内容</span>
+              <input class="step-extra" placeholder="按动作类型填写" />
+            </label>
+            <label class="step-field step-field-timeout">
+              <span class="step-field-label">超时(ms)</span>
+              <input class="step-timeout" type="number" placeholder="15000" />
+            </label>
+          </div>
+          <div class="step-row step-row-sub">
+            <div class="step-flags">
+              <label class="check step-flag" title="点击后监视 OAuth 新标签">
+                <input type="checkbox" class="step-watch-popup" /> 监视弹窗
+              </label>
+              <label class="check step-flag" title="点击后等待整页跳转">
+                <input type="checkbox" class="step-wait-nav" /> 等页面跳转
+              </label>
+            </div>
+            <div class="step-ops">
+              <button type="button" class="btn ghost sm step-up" title="上移">↑</button>
+              <button type="button" class="btn ghost sm step-down" title="下移">↓</button>
+              <button type="button" class="btn danger ghost sm step-del">删除</button>
+            </div>
+          </div>
+          <p class="step-desc"></p>
+        </div>
+      </div>
+    </template>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
