@@ -21,6 +21,7 @@ rsync -a \
   --exclude '.gitignore' \
   --exclude 'scripts' \
   --exclude 'fixtures' \
+  --exclude 'market' \
   ./ "$OUT_DIR/$NAME/"
 
 # 附带说明

@@ -18,6 +18,8 @@
         </div>
         <nav class="nav">
           <button class="nav-item active" data-tab="sites">站点管理</button>
+          <button class="nav-item" data-tab="procedures">流程库</button>
+          <button class="nav-item" data-tab="market">流程市场</button>
           <button class="nav-item" data-tab="logs">签到日志</button>
           <button class="nav-item" data-tab="settings">全局设置</button>
           <button class="nav-item" data-tab="io">导入 / 导出</button>
@@ -91,12 +93,9 @@
                       <span class="meta-label">定时</span>
                       <span class="meta-value" id="detailSched">-</span>
                     </div>
-                    <div class="meta-item">
-                      <span class="meta-label">步骤</span>
-                      <span class="meta-value" id="detailSteps">0</span>
-                    </div>
                   </div>
                 </div>
+
                 <!-- ① 基本信息 -->
                 <section class="card">
                   <header class="card-head">
@@ -123,89 +122,33 @@
                   </div>
                 </section>
 
-                <!-- ② 签到动作 -->
+                <!-- ② 签到流程 -->
                 <section class="card">
                   <header class="card-head">
                     <span class="card-num">2</span>
                     <div>
-                      <h3>签到动作</h3>
-                      <p>用步骤模拟点击，或写自定义脚本</p>
+                      <h3>签到流程</h3>
+                      <p>选择一个签到流程（步骤或脚本在「流程库」中维护）</p>
                     </div>
                   </header>
                   <div class="card-body">
-                    <div class="mode-switch" id="modeSeg">
-                      <label class="mode-opt">
-                        <input type="radio" name="mode" value="steps" checked />
-                        <span>可视化步骤</span>
-                      </label>
-                      <label class="mode-opt">
-                        <input type="radio" name="mode" value="script" />
-                        <span>自定义脚本</span>
-                      </label>
+                    <div class="proc-pick">
+                      <select name="checkinProcedureId" id="f-checkinProc" class="proc-select"></select>
+                      <button type="button" id="btnNewCheckinProc" class="btn sm">＋ 新建</button>
+                      <button type="button" id="btnEditCheckinProc" class="btn sm ghost">编辑</button>
                     </div>
-
-                    <div id="stepsBlock" class="mode-block">
-                      <div class="section-toolbar">
-                        <span class="section-label">执行步骤（按顺序）</span>
-                        <div class="section-actions">
-                          <button type="button" id="btnToggleHelp" class="btn ghost sm">使用说明</button>
-                          <button type="button" id="btnLoadExample" class="btn ghost sm">填入示例</button>
-                          <button type="button" id="btnAddStep" class="btn sm">＋ 添加步骤</button>
-                        </div>
-                      </div>
-
-                      <details class="help-panel" id="stepsHelp">
-                        <summary>如何填写步骤？点开查看</summary>
-                        <div class="help-body">
-                          <p>扩展会按顺序操作网页。最常见只需 <strong>2 步</strong>：</p>
-                          <ol>
-                            <li><strong>点击元素</strong> — 填签到按钮的选择器（CSS 或 XPath）</li>
-                            <li><strong>等待文字出现</strong> — 附加栏填「签到成功」等提示语</li>
-                          </ol>
-                          <p><strong>复制选择器：</strong>网页按 F12 → 选中按钮 → 右键 HTML → Copy → Copy selector 或 Copy XPath，粘贴到「目标」框。</p>
-                          <p>支持 CSS（如 <code>.checkin</code>）和 XPath（如 <code>//button[contains(.,"签到")]</code>）。</p>
-                        </div>
-                      </details>
-
-                      <div id="stepsList" class="steps-list"></div>
+                    <div class="checks">
+                      <label class="check"><input type="radio" name="mode" value="steps" checked /> 按步骤执行</label>
+                      <label class="check"><input type="radio" name="mode" value="script" /> 运行自定义脚本</label>
                     </div>
-
-                    <div id="scriptBlock" class="mode-block hidden">
-                      <div class="section-toolbar">
-                        <span class="section-label">脚本内容</span>
-                        <button type="button" id="btnResetScript" class="btn ghost sm">恢复模板</button>
-                      </div>
-                      <textarea name="script" rows="12" spellcheck="false" class="code"></textarea>
-                      <p class="hint">需 <code>return { ok, message }</code>，支持 async/await。无法使用 chrome.* API。</p>
-                    </div>
+                    <div id="checkinProcPreview" class="proc-preview"></div>
                   </div>
                 </section>
 
-                <!-- ③ 结果判定 -->
+                <!-- ③ 定时 -->
                 <section class="card">
                   <header class="card-head">
                     <span class="card-num">3</span>
-                    <div>
-                      <h3>结果判定</h3>
-                      <p>根据页面文字判断签到是否成功（可选）</p>
-                    </div>
-                  </header>
-                  <div class="card-body grid-2">
-                    <div class="field">
-                      <label>成功关键词（逗号分隔）</label>
-                      <input name="successKeywords" placeholder="签到成功,已签到" />
-                    </div>
-                    <div class="field">
-                      <label>失败关键词（逗号分隔）</label>
-                      <input name="failKeywords" placeholder="失败,未登录" />
-                    </div>
-                  </div>
-                </section>
-
-                <!-- ④ 定时 -->
-                <section class="card">
-                  <header class="card-head">
-                    <span class="card-num">4</span>
                     <div>
                       <h3>定时签到</h3>
                       <p>每天固定时间自动执行</p>
@@ -224,51 +167,31 @@
                   </div>
                 </section>
 
-                <!-- ⑤ 登录 / OAuth（折叠） -->
+                <!-- ④ 登录流程 -->
                 <section class="card card-muted">
                   <header class="card-head">
-                    <span class="card-num">5</span>
+                    <span class="card-num">4</span>
                     <div>
-                      <h3>登录 / OAuth <span class="tag">可选</span></h3>
-                      <p>需要先跳转第三方登录时再配置</p>
+                      <h3>登录流程 <span class="tag">可选</span></h3>
+                      <p>需要登录 / OAuth 的站点选择一个登录流程，签到中掉线会自动重登</p>
                     </div>
                   </header>
                   <div class="card-body">
-                    <label class="check big">
-                      <input name="loginEnabled" type="checkbox" id="loginEnabled" /> 启用登录流程
-                    </label>
-                    <div id="loginFields" class="login-fields">
-                      <p class="hint">
-                        未检测到「已登录」标记时，先执行登录步骤，再签到。
-                        首次 OAuth 通常需人工点一次授权。
-                      </p>
-                      <div class="grid-2">
-                        <div class="field">
-                          <label>已登录标记（CSS / XPath）</label>
-                          <input name="loggedInSelector" placeholder=".avatar  或  //img[contains(@class,'avatar')]" />
-                        </div>
-                        <div class="field">
-                          <label>已登录 URL 包含</label>
-                          <input name="loggedInUrlIncludes" placeholder="/dashboard" />
-                        </div>
-                      </div>
-                      <div class="field field-narrow">
-                        <label>登录超时（毫秒）</label>
-                        <input name="loginTimeoutMs" type="number" min="10000" step="1000" value="180000" />
-                      </div>
-                      <div class="section-toolbar">
-                        <span class="section-label">登录步骤</span>
-                        <button type="button" id="btnAddLoginStep" class="btn sm">＋ 添加</button>
-                      </div>
-                      <div id="loginStepsList" class="steps-list"></div>
+                    <div class="proc-pick">
+                      <select name="loginProcedureId" id="f-loginProc" class="proc-select">
+                        <option value="">（不使用登录流程）</option>
+                      </select>
+                      <button type="button" id="btnNewLoginProc" class="btn sm">＋ 新建</button>
+                      <button type="button" id="btnEditLoginProc" class="btn sm ghost">编辑</button>
                     </div>
+                    <div id="loginProcPreview" class="proc-preview"></div>
                   </div>
                 </section>
 
-                <!-- ⑥ 高级超时 -->
+                <!-- ⑤ 高级超时 -->
                 <section class="card card-muted">
                   <header class="card-head">
-                    <span class="card-num">6</span>
+                    <span class="card-num">5</span>
                     <div>
                       <h3>超时设置 <span class="tag">高级</span></h3>
                       <p>一般保持默认即可</p>
@@ -286,7 +209,6 @@
                   </div>
                 </section>
 
-                <!-- 底部操作栏 -->
                 <div class="form-footer">
                   <div class="form-footer-left">
                     <button type="submit" class="btn primary lg">保存</button>
@@ -297,6 +219,190 @@
                 <p id="formMsg" class="form-msg"></p>
               </form>
             </div>
+          </div>
+        </section>
+
+        <!-- 流程库 -->
+        <section id="tab-procedures" class="tab">
+          <div class="toolbar">
+            <h2>流程库</h2>
+            <div class="toolbar-actions">
+              <div class="seg" id="procKindSeg">
+                <button type="button" class="seg-btn active" data-kind="">全部</button>
+                <button type="button" class="seg-btn" data-kind="checkin">签到</button>
+                <button type="button" class="seg-btn" data-kind="login">登录</button>
+              </div>
+              <input id="procSearch" class="search-input" placeholder="搜索流程名称…" />
+              <button id="btnNewProc" class="btn primary">＋ 新建流程</button>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="panel list-panel">
+              <div class="panel-title">
+                <span>流程</span>
+                <span class="count" id="procCount">0</span>
+              </div>
+              <div id="procList" class="proc-list"></div>
+            </div>
+
+            <div class="editor-wrap">
+              <div id="procEditorEmpty" class="empty-hint panel">
+                选择左侧流程进行编辑，或点击「新建流程」
+              </div>
+
+              <form id="procForm" class="site-form hidden">
+                <div class="detail-head proc-detail">
+                  <div class="detail-main">
+                    <h3 id="procDetailTitle">流程</h3>
+                    <div class="detail-url" id="procDetailMeta"></div>
+                  </div>
+                </div>
+
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">i</span>
+                    <div>
+                      <h3>基本信息</h3>
+                      <p>流程名称与类型</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="grid-2">
+                      <div class="field">
+                        <label>名称</label>
+                        <input name="name" required placeholder="例如：通用 Discuz! 签到" />
+                      </div>
+                      <div class="field">
+                        <label>类型</label>
+                        <select name="kind" id="procKind">
+                          <option value="checkin">签到流程</option>
+                          <option value="login">登录流程</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label>简介</label>
+                      <input name="description" placeholder="这个流程做什么（分享时会展示）" />
+                    </div>
+                    <div class="grid-2">
+                      <div class="field">
+                        <label>作者</label>
+                        <input name="author" placeholder="可选" />
+                      </div>
+                      <div class="field">
+                        <label>版本</label>
+                        <input name="version" placeholder="1.0.0" />
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label>主页 / 文档</label>
+                      <input name="homepage" placeholder="https://…" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- 检测规则 -->
+                <section class="card" id="procDetectCard">
+                  <header class="card-head">
+                    <span class="card-num">✓</span>
+                    <div>
+                      <h3 id="procDetectTitle">结果判定</h3>
+                      <p id="procDetectDesc">根据页面文字判断签到是否成功</p>
+                    </div>
+                  </header>
+                  <div class="card-body" id="procDetectBody"></div>
+                </section>
+
+                <!-- 步骤 / 脚本 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">▶</span>
+                    <div>
+                      <h3 id="procActionTitle">执行步骤</h3>
+                      <p>按顺序操作页面</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="mode-switch" id="procModeSeg">
+                      <label class="mode-opt">
+                        <input type="radio" name="procMode" value="steps" checked />
+                        <span>可视化步骤</span>
+                      </label>
+                      <label class="mode-opt">
+                        <input type="radio" name="procMode" value="script" />
+                        <span>自定义脚本</span>
+                      </label>
+                    </div>
+
+                    <div id="procStepsBlock" class="mode-block">
+                      <div class="section-toolbar">
+                        <span class="section-label">执行步骤（按顺序）</span>
+                        <div class="section-actions">
+                          <button type="button" id="btnProcToggleHelp" class="btn ghost sm">使用说明</button>
+                          <button type="button" id="btnProcAddStep" class="btn sm">＋ 添加步骤</button>
+                        </div>
+                      </div>
+                      <details class="help-panel" id="procStepsHelp">
+                        <summary>如何填写步骤？点开查看</summary>
+                        <div class="help-body">
+                          <p>扩展会按顺序操作网页。最常见只需 <strong>2 步</strong>：</p>
+                          <ol>
+                            <li><strong>点击元素</strong> — 填签到按钮的选择器（CSS 或 XPath）</li>
+                            <li><strong>等待文字出现</strong> — 附加栏填「签到成功」等提示语</li>
+                          </ol>
+                          <p>支持 CSS（如 <code>.checkin</code>）和 XPath（如 <code>//button[contains(.,"签到")]</code>）。</p>
+                        </div>
+                      </details>
+                      <div id="procStepsList" class="steps-list"></div>
+                    </div>
+
+                    <div id="procScriptBlock" class="mode-block hidden">
+                      <div class="section-toolbar">
+                        <span class="section-label">脚本内容</span>
+                        <button type="button" id="btnProcResetScript" class="btn ghost sm">恢复模板</button>
+                      </div>
+                      <textarea name="script" rows="12" spellcheck="false" class="code"></textarea>
+                      <p class="hint">需 <code>return { ok, message }</code>，支持 async/await。</p>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="form-footer">
+                  <div class="form-footer-left">
+                    <button type="submit" class="btn primary lg">保存流程</button>
+                    <button type="button" id="btnExportProc" class="btn lg">导出 JSON</button>
+                    <button type="button" id="btnDuplicateProc" class="btn lg ghost">复制副本</button>
+                  </div>
+                  <button type="button" id="btnDeleteProc" class="btn danger ghost">删除流程</button>
+                </div>
+                <p id="procFormMsg" class="form-msg"></p>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- 流程市场 -->
+        <section id="tab-market" class="tab">
+          <div class="toolbar">
+            <h2>流程市场</h2>
+            <div class="toolbar-actions">
+              <div class="seg" id="marketKindSeg">
+                <button type="button" class="seg-btn active" data-kind="">全部</button>
+                <button type="button" class="seg-btn" data-kind="checkin">签到</button>
+                <button type="button" class="seg-btn" data-kind="login">登录</button>
+              </div>
+              <input id="marketSearch" class="search-input" placeholder="搜索市场…" />
+              <button id="btnRefreshMarket" class="btn">刷新</button>
+            </div>
+          </div>
+          <div class="market-hint">
+            市场源：<input id="marketUrl" class="market-url-input" />
+            <button id="btnSaveMarketUrl" class="btn sm">保存</button>
+            <a id="marketDocLink" href="#" target="_blank" rel="noreferrer" class="market-doc">如何搭建自己的市场？</a>
+          </div>
+          <div id="marketList" class="market-list">
+            <div class="empty-hint">点击「刷新」加载市场目录</div>
           </div>
         </section>
 
@@ -352,15 +458,15 @@
             <div class="card">
               <div class="card-body">
                 <h3>导出</h3>
-                <p class="hint">导出全部站点配置、全局设置与日志为 JSON。</p>
+                <p class="hint">导出全部站点、流程、全局设置与日志为 JSON。</p>
                 <button id="btnExport" class="btn primary">导出 JSON</button>
               </div>
             </div>
             <div class="card">
               <div class="card-body">
                 <h3>导入</h3>
-                <p class="hint">默认按站点 id 合并；勾选后替换全部站点。</p>
-                <label class="check"><input id="importReplace" type="checkbox" /> 替换现有站点（不合并）</label>
+                <p class="hint">默认按 id 合并；勾选后替换全部站点与流程。</p>
+                <label class="check"><input id="importReplace" type="checkbox" /> 替换现有数据（不合并）</label>
                 <div class="io-row">
                   <input id="importFile" type="file" accept="application/json,.json" />
                   <button id="btnImport" class="btn">导入</button>

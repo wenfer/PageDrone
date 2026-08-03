@@ -1,0 +1,26 @@
+{
+  "spec": "auto-checkin-market/1",
+  "updated": "2026-08-03T00:00:00Z",
+  "items": [
+    {
+      "marketId": "example-discuz-checkin",
+      "name": "Discuz! 论坛签到",
+      "kind": "checkin",
+      "description": "通用 Discuz! 论坛每日签到：点击「签到」按钮，等待成功提示。",
+      "author": "auto-checkin",
+      "version": "1.0.0",
+      "homepage": "https://github.com/wenfer/auto-checkin-procedures",
+      "updatedAt": "2026-08-03T00:00:00Z"
+    },
+    {
+      "marketId": "example/generic-login",
+      "name": "通用账号密码登录",
+      "kind": "login",
+      "description": "输入用户名密码并点击登录的通用流程。安装后请填入实际选择器。",
+      "author": "auto-checkin",
+      "version": "1.0.0",
+      "homepage": "https://github.com/wenfer/auto-checkin-procedures",
+      "updatedAt": "2026-08-03T00:00:00Z"
+    }
+  ]
+}

@@ -1010,3 +1010,204 @@ html, body {
   .detail-meta { flex-wrap: wrap; }
   .meta-item { text-align: left; }
 }
+
+/* —— 分段控件 / 搜索框 —— */
+.seg {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 500;
+}
+.seg-btn.active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  font-weight: 600;
+}
+.search-input {
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 0 14px;
+  min-height: 38px;
+  font: inherit;
+  width: 200px;
+  background: #fff;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* —— 流程选择 —— */
+.proc-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.proc-select {
+  flex: 1;
+  min-height: var(--input-h);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 0 14px;
+  font: inherit;
+  background: #fff;
+}
+.proc-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.proc-preview {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.proc-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.proc-step-preview {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.kind-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+.kind-tag.kind-checkin { background: #dbeafe; color: #1e40af; }
+.kind-tag.kind-login { background: #fef3c7; color: #92400e; }
+
+/* —— 流程库列表 —— */
+.proc-list { overflow: auto; flex: 1; }
+.proc-card {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.proc-card:hover { background: #f8fafc; }
+.proc-card.active {
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.proc-card-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.proc-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proc-card-sub {
+  display: flex;
+  gap: 6px;
+  padding-left: 50px;
+}
+
+/* —— 流程详情头 —— */
+.proc-detail {
+  background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);
+}
+
+/* —— 市场 —— */
+.market-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.market-url-input {
+  flex: 1;
+  min-width: 280px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+}
+.market-doc {
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: none;
+}
+.market-doc:hover { text-decoration: underline; }
+.market-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.market-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+.market-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.market-version {
+  font-size: 11px;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.market-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.market-meta a { color: var(--primary); text-decoration: none; }
+.market-card-action { flex-shrink: 0; display: flex; align-items: center; }
+
+@media (max-width: 720px) {
+  .market-list { grid-template-columns: 1fr; }
+  .search-input { width: 100%; }
+}

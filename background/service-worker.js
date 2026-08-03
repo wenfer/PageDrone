@@ -8,6 +8,9 @@ import {
   getSites,
   getSettings,
   setRuntime,
+  getProcedures,
+  upsertProcedure,
+  removeProcedure,
 } from '../lib/storage.js';
 import {
   enqueueSites,
@@ -17,11 +20,18 @@ import {
   isQueueRunning,
   stopQueue,
 } from '../lib/runner.js';
+import { runMigrations } from '../lib/migrate.js';
+import { fetchMarketIndex, installFromMarket } from '../lib/market.js';
 
-chrome.runtime.onInstalled.addListener(async (details) => {
-  await setRuntime({ state: 'idle', message: '已安装', queue: [] });
+async function bootstrap() {
+  await runMigrations();
+  await setRuntime({ state: 'idle', message: '已就绪', queue: [] });
   await rescheduleAllAlarms();
   await updateBadgeFromLogs();
+}
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+  await bootstrap();
   if (details.reason === 'install') {
     try {
       await chrome.runtime.openOptionsPage();
@@ -33,15 +43,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   // 浏览器重启后内存队列已空，复位运行态
-  await setRuntime({
-    state: 'idle',
-    message: '空闲',
-    queue: [],
-    currentSiteId: null,
-    currentSiteName: null,
-  });
-  await rescheduleAllAlarms();
-  await updateBadgeFromLogs();
+  await bootstrap();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -50,7 +52,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.sites) {
+  if (changes.sites || changes.procedures) {
     rescheduleAllAlarms();
   }
 });
@@ -85,12 +87,13 @@ async function handleMessage(message) {
 
     case MSG.GET_STATUS:
     case 'GET_STATUS': {
-      const [runtime, sites, settings] = await Promise.all([
+      const [runtime, sites, settings, procedures] = await Promise.all([
         getRuntime(),
         getSites(),
         getSettings(),
+        getProcedures(),
       ]);
-      return { runtime, sites, settings, queueRunning: isQueueRunning() };
+      return { runtime, sites, settings, procedures, queueRunning: isQueueRunning() };
     }
 
     case MSG.RUN_ALL:
@@ -122,6 +125,34 @@ async function handleMessage(message) {
     case 'STOP':
     case 'stop': {
       return stopQueue(message.reason || '用户强制停止');
+    }
+
+    // —— Procedures ——
+    case MSG.PROCEDURE_LIST: {
+      const procedures = await getProcedures();
+      return { procedures };
+    }
+    case MSG.PROCEDURE_SAVE: {
+      if (!message.procedure) throw new Error('缺少 procedure');
+      const saved = await upsertProcedure(message.procedure);
+      await rescheduleAllAlarms();
+      return { procedure: saved };
+    }
+    case MSG.PROCEDURE_DELETE: {
+      if (!message.id) throw new Error('缺少 id');
+      await removeProcedure(message.id);
+      return { deleted: true };
+    }
+
+    // —— Market ——
+    case MSG.MARKET_INDEX: {
+      const index = await fetchMarketIndex();
+      return { index };
+    }
+    case MSG.MARKET_INSTALL: {
+      if (!message.marketId) throw new Error('缺少 marketId');
+      const result = await installFromMarket(message.marketId);
+      return result;
     }
 
     default:

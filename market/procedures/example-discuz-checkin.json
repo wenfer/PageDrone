@@ -1,0 +1,20 @@
+{
+  "spec": "auto-checkin-procedure/1",
+  "procedure": {
+    "kind": "checkin",
+    "name": "Discuz! 论坛签到",
+    "description": "通用 Discuz! 论坛每日签到：点击「签到」按钮，等待成功提示。选择器可能需要按站点调整。",
+    "detect": {
+      "successKeywords": ["签到成功", "已签到", "本次签到", "恭喜"],
+      "failKeywords": ["失败", "请登录", "您还没有登录"]
+    },
+    "steps": [
+      { "type": "click", "selector": "#kx sign, a[href*='dsu_paulsign'], a[href*='sign']", "timeoutMs": 15000, "waitNavigation": true },
+      { "type": "waitForText", "selector": "body", "includes": "签到成功", "timeoutMs": 15000 }
+    ],
+    "script": "",
+    "author": "auto-checkin",
+    "homepage": "https://github.com/wenfer/auto-checkin-procedures",
+    "version": "1.0.0"
+  }
+}
