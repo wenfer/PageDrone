@@ -25,6 +25,7 @@ let currentId = null;
 init();
 
 async function init() {
+  loadVersion();
   // tabs
   $$('.nav-item').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -81,6 +82,17 @@ async function init() {
   await renderLogs();
 }
 
+async function loadVersion() {
+  try {
+    const url = chrome.runtime.getURL('manifest.json');
+    const m = await fetch(url).then((r) => r.json());
+    const el = document.getElementById('versionLabel');
+    if (el) el.textContent = 'v' + (m.version || '?');
+  } catch {
+    /* ignore */
+  }
+}
+
 function switchTab(name) {
   $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${name}`));
@@ -105,25 +117,37 @@ async function reloadSites() {
 function renderSiteList() {
   const list = $('#siteList');
   list.innerHTML = '';
+  const countEl = $('#siteCount');
+  if (countEl) countEl.textContent = sites.length;
   if (!sites.length) {
-    list.innerHTML = '<div class="empty-hint">暂无站点</div>';
+    list.innerHTML = '<div class="empty-hint compact">暂无站点<br><small>点右上角「新建站点」开始</small></div>';
     return;
   }
   for (const site of sites) {
     const el = document.createElement('div');
     el.className = 'site-card' + (site.id === currentId ? ' active' : '');
     const st = site.lastResult?.status;
+    const dotCls = st ? `dot-${st}` : 'dot-never';
+    const host = shortHost(site.url);
+    const title = escapeHtml(`${site.name}\n${site.url}`);
+    el.title = title;
     el.innerHTML = `
-      <div class="name">${escapeHtml(site.name)}</div>
-      <div class="url">${escapeHtml(site.url)}</div>
-      <div class="meta">
-        ${site.enabled ? '' : '<span class="badge off">禁用</span> '}
-        ${st ? `<span class="badge ${st}">${escapeHtml(STATUS_LABEL[st] || st)}</span>` : '<span class="badge">未签到</span>'}
-        ${site.schedule?.enabled ? ' · 定时' : ''}
-      </div>
+      <span class="status-dot ${dotCls}" title="${st ? escapeHtml(STATUS_LABEL[st] || st) : '未签到'}"></span>
+      <span class="name">${escapeHtml(site.name)}</span>
+      <span class="host">${escapeHtml(host)}</span>
+      ${site.enabled ? '' : '<span class="mini-badge off">禁用</span>'}
+      ${site.schedule?.enabled ? '<span class="mini-badge sched" title="已开启定时">⏰</span>' : ''}
     `;
     el.addEventListener('click', () => selectSite(site.id));
     list.appendChild(el);
+  }
+}
+
+function shortHost(url) {
+  try {
+    return new URL(url).host.replace(/^www\./, '');
+  } catch {
+    return String(url || '').replace(/^https?:\/\//, '').split('/')[0] || '';
   }
 }
 

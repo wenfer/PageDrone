@@ -25,6 +25,7 @@
         <div class="sidebar-foot">
           <button id="btnRunAll" class="btn primary block">全部签到</button>
           <button id="btnStop" class="btn danger-outline block">强制停止</button>
+          <div class="sidebar-version" id="versionLabel">v…</div>
         </div>
       </aside>
 
@@ -40,7 +41,10 @@
 
           <div class="split">
             <div class="panel list-panel">
-              <div class="panel-title">我的站点</div>
+              <div class="panel-title">
+                <span>我的站点</span>
+                <span class="count" id="siteCount">0</span>
+              </div>
               <div id="siteList" class="site-list"></div>
             </div>
 

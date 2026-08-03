@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "自动签到助手",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "为各类网站配置自动化签到，支持 Cloudflare 等待、可视化步骤与自定义脚本、定时任务。",
   "permissions": [
     "storage",

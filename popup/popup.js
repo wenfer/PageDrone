@@ -26,9 +26,21 @@ async function init() {
   btnRefresh.addEventListener('click', refresh);
   btnSettings.addEventListener('click', openOptions);
   btnOpenOptions?.addEventListener('click', openOptions);
+  loadVersion();
   await refresh();
   pollTimer = setInterval(refresh, 1500);
   window.addEventListener('unload', () => clearInterval(pollTimer));
+}
+
+async function loadVersion() {
+  try {
+    const url = chrome.runtime.getURL('manifest.json');
+    const m = await fetch(url).then((r) => r.json());
+    const el = document.getElementById('versionLabel');
+    if (el) el.textContent = 'v' + (m.version || '?');
+  } catch {
+    /* ignore */
+  }
 }
 
 async function send(type, payload = {}) {
