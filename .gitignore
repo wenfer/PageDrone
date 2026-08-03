@@ -28,3 +28,8 @@ npm-debug.log*
 /tmp/
 package/
 .output/
+
+# 本地私钥，严禁提交
+private.pem
+*.pem
+!certs/.gitkeep

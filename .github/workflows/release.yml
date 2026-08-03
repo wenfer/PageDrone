@@ -7,9 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（不含 v 前缀，如 1.0.2）。留空则读取 manifest.json'
+        description: '版本号（不含 v 前缀，如 1.0.3）。留空则读取 manifest.json'
         required: false
         default: ''
+      crx:
+        description: '同时打包 CRX（需要 CRX_PRIVATE_KEY）'
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
@@ -21,8 +26,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Resolve version
         id: ver
+        shell: bash
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
@@ -38,10 +49,12 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Resolved version=${VERSION} tag=${TAG}"
 
-      - name: Sync manifest version (tag/manual)
+      - name: Sync manifest version
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
           python3 - <<'PY'
           import json, os
           path = "manifest.json"
@@ -53,20 +66,17 @@ jobs:
               f.write("\n")
           print("manifest version ->", data["version"])
           PY
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
 
-      - name: Package extension zip
-        id: pack
+      - name: Stage extension files
+        id: stage
+        shell: bash
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          OUT_DIR="dist"
           NAME="auto-checkin-v${VERSION}"
-          ZIP_NAME="${NAME}.zip"
-          mkdir -p "$OUT_DIR" "$OUT_DIR/$NAME"
-
-          # 仅打包扩展运行所需文件
+          STAGE="dist/${NAME}"
+          mkdir -p dist
+          rm -rf "$STAGE"
           rsync -a \
             --exclude '.git' \
             --exclude '.github' \
@@ -74,24 +84,100 @@ jobs:
             --exclude 'node_modules' \
             --exclude '.claude' \
             --exclude '.gitignore' \
-            --exclude '*.md' \
+            --exclude 'scripts' \
             --exclude 'fixtures' \
-            ./ "$OUT_DIR/$NAME/"
+            --exclude '*.pem' \
+            ./ "$STAGE/"
+          cp -f README.md "$STAGE/" 2>/dev/null || true
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "stage=${STAGE}" >> "$GITHUB_OUTPUT"
+          echo "=== Staged files ==="
+          find "$STAGE" -type f | sort
 
-          # README 可选附带
-          if [ -f README.md ]; then
-            cp README.md "$OUT_DIR/$NAME/"
+      - name: Build ZIP
+        id: zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="${{ steps.stage.outputs.name }}"
+          (cd dist && zip -rq "${NAME}.zip" "${NAME}" -x "*.DS_Store")
+          echo "zip_path=dist/${NAME}.zip" >> "$GITHUB_OUTPUT"
+          ls -lh "dist/${NAME}.zip"
+
+      - name: Prepare CRX private key
+        id: key
+        shell: bash
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          WANT_CRX=true
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            WANT_CRX="${{ inputs.crx }}"
+          fi
+          if [ "$WANT_CRX" != "true" ]; then
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::按输入跳过 CRX 打包"
+            exit 0
+          fi
+          if [ -z "${CRX_PRIVATE_KEY:-}" ]; then
+            echo "::warning::CRX_PRIVATE_KEY 未配置，跳过 CRX"
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KEY_FILE=dist/crx-private.pem
+          printf '%s\n' "$CRX_PRIVATE_KEY" > "$KEY_FILE"
+          # 兼容 base64 包裹
+          if ! head -1 "$KEY_FILE" | grep -q -- '-----BEGIN'; then
+            if base64 -d "$KEY_FILE" > "${KEY_FILE}.dec" 2>/dev/null && grep -q -- 'BEGIN' "${KEY_FILE}.dec"; then
+              mv "${KEY_FILE}.dec" "$KEY_FILE"
+            fi
+          fi
+          chmod 600 "$KEY_FILE"
+          echo "Key head: $(head -1 "$KEY_FILE")"
+          # 必须是私钥
+          if grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$KEY_FILE"; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::CRX_PRIVATE_KEY 看起来不是私钥（应以 -----BEGIN PRIVATE KEY----- 或 -----BEGIN RSA PRIVATE KEY----- 开头）"
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
-          (
-            cd "$OUT_DIR"
-            zip -r "$ZIP_NAME" "$NAME" -x "*.DS_Store"
-          )
+      - name: Build CRX
+        id: crx
+        if: steps.key.outputs.has_key == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="${{ steps.stage.outputs.stage }}"
+          NAME="${{ steps.stage.outputs.name }}"
+          CRX_PATH="dist/${NAME}.crx"
+          EXT_ID=$(python3 scripts/build_crx.py "$STAGE" dist/crx-private.pem "$CRX_PATH" | tee /dev/stderr | grep 'Extension ID' | awk '{print $3}')
+          echo "crx_path=${CRX_PATH}" >> "$GITHUB_OUTPUT"
+          echo "ext_id=${EXT_ID}" >> "$GITHUB_OUTPUT"
+          ls -lh "$CRX_PATH"
+          # 校验 CRX 头
+          head -c 4 "$CRX_PATH" | od -c | head -1
 
-          echo "zip_path=dist/${ZIP_NAME}" >> "$GITHUB_OUTPUT"
-          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
-          ls -lh "dist/${ZIP_NAME}"
-          unzip -l "dist/${ZIP_NAME}" | head -50
+      - name: Build update.xml
+        if: steps.crx.outputs.crx_path != ''
+        shell: bash
+        env:
+          EXT_ID: ${{ steps.crx.outputs.ext_id }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          cat > dist/update.xml <<XML
+          <?xml version='1.0' encoding='UTF-8'?>
+          <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+            <app appid='${EXT_ID}'>
+              <updatecheck codebase='https://github.com/${{ github.repository }}/releases/download/v${VERSION}/auto-checkin-v${VERSION}.crx' version='${VERSION}' />
+            </app>
+          </gupdate>
+          XML
+          echo "=== update.xml ==="
+          cat dist/update.xml
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -99,17 +185,31 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: Release ${{ steps.ver.outputs.tag }}
           generate_release_notes: true
-          files: ${{ steps.pack.outputs.zip_path }}
+          files: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.crx.outputs.crx_path }}
+            dist/update.xml
           body: |
             ## 自动签到助手 ${{ steps.ver.outputs.tag }}
 
-            ### 安装
-            1. 下载附件 `${{ steps.pack.outputs.zip_name }}` 并解压
+            ### 安装（ZIP，推荐 Chrome 开发者模式）
+            1. 下载 `auto-checkin-v${{ steps.ver.outputs.version }}.zip` 并解压
             2. Chrome 打开 `chrome://extensions`
-            3. 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压后的文件夹
+            3. 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压目录
 
-            ### 说明
-            - Manifest V3 Chrome 扩展
-            - 支持可视化步骤 / 自定义脚本、Cloudflare 等待、OAuth 登录流、定时签到
+            ### CRX（签名包）
+            - `auto-checkin-v${{ steps.ver.outputs.version }}.crx`
+            - 扩展 ID：`${{ steps.crx.outputs.ext_id }}`
+            - `update.xml`：自托管自动更新清单（可用于企业策略分发）
+
+            ### 更新内容
+            - 可视化步骤 / 自定义脚本
+            - Cloudflare 等待、OAuth 登录流、每日定时
+            - 重定向点击自动处理、强制停止
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup key
+        if: always()
+        shell: bash
+        run: rm -f dist/crx-private.pem dist/crx-private.pem.dec
