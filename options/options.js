@@ -641,7 +641,7 @@ function bindProcEditor() {
     const proc = collectProcFromForm();
     renderProcDetectFields(proc);
   });
-  $('#procForm [name="procMode"]').forEach((r) => r.addEventListener('change', syncProcModeBlocks));
+  $$('#procForm [name="procMode"]').forEach((r) => r.addEventListener('change', syncProcModeBlocks));
   $('#btnProcToggleHelp')?.addEventListener('click', () => {
     const panel = $('#procStepsHelp');
     panel.open = !panel.open;
