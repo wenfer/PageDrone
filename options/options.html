@@ -39,6 +39,29 @@
             </div>
           </div>
 
+          <div class="stats" id="siteStats">
+            <div class="stat">
+              <div class="stat-num" id="statTotal">0</div>
+              <div class="stat-label">总站点</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num text-blue" id="statEnabled">0</div>
+              <div class="stat-label">已启用</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num text-amber" id="statScheduled">0</div>
+              <div class="stat-label">定时中</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num text-green" id="statSuccess">0</div>
+              <div class="stat-label">今日成功</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num text-red" id="statFailed">0</div>
+              <div class="stat-label">异常站点</div>
+            </div>
+          </div>
+
           <div class="split">
             <div class="panel list-panel">
               <div class="panel-title">
@@ -54,6 +77,26 @@
               </div>
 
               <form id="siteForm" class="site-form hidden">
+                <div class="detail-head" id="siteDetailHead">
+                  <div class="detail-main">
+                    <h3 id="detailTitle">站点</h3>
+                    <a id="detailUrl" class="detail-url" target="_blank" rel="noreferrer"></a>
+                  </div>
+                  <div class="detail-meta">
+                    <div class="meta-item">
+                      <span class="meta-label">最近结果</span>
+                      <span class="meta-value" id="detailLast">-</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">定时</span>
+                      <span class="meta-value" id="detailSched">-</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">步骤</span>
+                      <span class="meta-value" id="detailSteps">0</span>
+                    </div>
+                  </div>
+                </div>
                 <!-- ① 基本信息 -->
                 <section class="card">
                   <header class="card-head">

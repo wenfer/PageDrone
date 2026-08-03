@@ -11,10 +11,12 @@ import {
   getSettings,
   saveSettings,
   getLogs,
+  getTasks,
   clearLogs,
   exportAll,
   importSites,
 } from '../lib/storage.js';
+import { TASK_TRIGGER_LABEL } from '../lib/models.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -52,6 +54,7 @@ async function init() {
       { type: 'waitForText', selector: 'body', includes: '签到成功', timeoutMs: 10000 },
     ];
     for (const step of example) addStepRow(step, '#stepsList');
+    updateDetailStepCount();
     setFormMsg('已填入示例：请把 .checkin 改成你网站真实按钮的选择器', 'ok');
   });
 
@@ -80,6 +83,12 @@ async function init() {
   await reloadSites();
   await loadSettingsForm();
   await renderLogs();
+  bindDetailLiveUpdates();
+
+  // 日志 / 状态自动刷新
+  setInterval(async () => {
+    if ($$('#tab-logs.active').length) await renderLogs();
+  }, 3000);
 }
 
 async function loadVersion() {
@@ -119,6 +128,7 @@ function renderSiteList() {
   list.innerHTML = '';
   const countEl = $('#siteCount');
   if (countEl) countEl.textContent = sites.length;
+  renderStats();
   if (!sites.length) {
     list.innerHTML = '<div class="empty-hint compact">暂无站点<br><small>点右上角「新建站点」开始</small></div>';
     return;
@@ -151,15 +161,107 @@ function shortHost(url) {
   }
 }
 
+function isToday(ts) {
+  if (!ts) return false;
+  const d = new Date(ts);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function renderStats() {
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(v);
+  };
+  const enabled = sites.filter((s) => s.enabled !== false);
+  const scheduled = enabled.filter((s) => s.schedule?.enabled);
+  const todaySuccess = sites.filter(
+    (s) => s.lastResult?.status === 'success' && isToday(s.lastResult.at)
+  );
+  const failed = sites.filter(
+    (s) =>
+      s.enabled !== false &&
+      s.lastResult &&
+      ['failed', 'cf_timeout', 'need_login'].includes(s.lastResult.status)
+  );
+  set('statTotal', sites.length);
+  set('statEnabled', enabled.length);
+  set('statScheduled', scheduled.length);
+  set('statSuccess', todaySuccess.length);
+  set('statFailed', failed.length);
+}
+
 function selectSite(id) {
   currentId = id;
   const site = sites.find((s) => s.id === id);
   renderSiteList();
   if (!site) return;
   fillForm(site);
+  renderDetailHead(site);
   $('#editorEmpty').classList.add('hidden');
   $('#siteForm').classList.remove('hidden');
   setFormMsg('');
+}
+
+function renderDetailHead(site) {
+  const titleEl = $('#detailTitle');
+  const urlEl = $('#detailUrl');
+  const lastEl = $('#detailLast');
+  const schedEl = $('#detailSched');
+  const stepsEl = $('#detailSteps');
+  if (!titleEl) return;
+  titleEl.textContent = site.name || '未命名站点';
+  urlEl.textContent = site.url || '';
+  urlEl.href = site.url && /^https?:\/\//i.test(site.url) ? site.url : '#';
+  const st = site.lastResult?.status;
+  if (st) {
+    const label = STATUS_LABEL[st] || st;
+    const at = site.lastResult?.at ? formatTime(site.lastResult.at) : '';
+    lastEl.textContent = at ? `${label} · ${at}` : label;
+    lastEl.className = 'meta-value badge-like status-' + st;
+  } else {
+    lastEl.textContent = '尚未签到';
+    lastEl.className = 'meta-value badge-like';
+  }
+  if (site.schedule?.enabled) {
+    const hh = String(site.schedule.hour ?? 8).padStart(2, '0');
+    const mm = String(site.schedule.minute ?? 5).padStart(2, '0');
+    schedEl.textContent = `每日 ${hh}:${mm}`;
+    schedEl.className = 'meta-value';
+  } else {
+    schedEl.textContent = '未开启';
+    schedEl.className = 'meta-value';
+  }
+  stepsEl.textContent = String(site.steps?.length || 0);
+}
+
+function bindDetailLiveUpdates() {
+  const form = $('#siteForm');
+  if (!form || form.dataset.detailBound) return;
+  form.dataset.detailBound = '1';
+  form.addEventListener('input', () => {
+    const id = currentId;
+    if (!id) return;
+    const site = sites.find((s) => s.id === id);
+    if (!site) return;
+    const titleEl = $('#detailTitle');
+    const urlEl = $('#detailUrl');
+    if (titleEl) titleEl.textContent = form.name.value || '未命名站点';
+    if (urlEl) {
+      urlEl.textContent = form.url.value || '';
+      urlEl.href = form.url.value && /^https?:\/\//i.test(form.url.value) ? form.url.value : '#';
+    }
+    updateDetailStepCount();
+  });
+}
+
+function updateDetailStepCount() {
+  const el = $('#detailSteps');
+  if (el) el.textContent = String($$('#stepsList .step-item').length);
 }
 
 function onNewSite() {
@@ -169,6 +271,7 @@ function onNewSite() {
   sites = [site, ...sites.filter((s) => s.id !== site.id)];
   fillForm(site);
   renderSiteList();
+  renderDetailHead(site);
   $('#editorEmpty').classList.add('hidden');
   $('#siteForm').classList.remove('hidden');
   setFormMsg('请填写后点击保存', '');
@@ -411,6 +514,7 @@ function addStepRow(step = { type: 'click', selector: '', timeoutMs: 15000 }, li
   $('.step-del', node).addEventListener('click', () => {
     node.remove();
     renumberSteps(listSel);
+    if (listSel === '#stepsList') updateDetailStepCount();
   });
   $('.step-up', node).addEventListener('click', () => {
     node.parentElement?.insertBefore(node, node.previousElementSibling);
@@ -423,6 +527,7 @@ function addStepRow(step = { type: 'click', selector: '', timeoutMs: 15000 }, li
 
   $(listSel).appendChild(node);
   renumberSteps(listSel);
+  if (listSel === '#stepsList') updateDetailStepCount();
 }
 
 function collectSteps(listSel = '#stepsList') {
@@ -659,29 +764,174 @@ async function onSaveSettings(e) {
 }
 
 async function renderLogs() {
-  const logs = await getLogs();
+  const [logs, tasks] = await Promise.all([getLogs(), getTasks()]);
   const root = $('#logTable');
-  if (!logs.length) {
+
+  if (!logs.length && !tasks.length) {
     root.innerHTML = '<div class="empty-hint">暂无日志</div>';
     return;
   }
-  const rows = logs
+
+  // 按 taskId 分组
+  const byTask = new Map();
+  const legacy = [];
+  for (const log of logs) {
+    if (log.taskId) {
+      if (!byTask.has(log.taskId)) byTask.set(log.taskId, []);
+      byTask.get(log.taskId).push(log);
+    } else {
+      legacy.push(log);
+    }
+  }
+
+  // 任务排序：最近开始在前
+  const taskList = [...tasks].sort(
+    (a, b) => (b.startedAt || 0) - (a.startedAt || 0)
+  );
+
+  // 还有日志但任务记录丢失（升级前数据等）
+  const orphanTaskIds = [...byTask.keys()].filter(
+    (id) => !tasks.some((t) => t.id === id)
+  );
+
+  let html = '<div class="task-list">';
+
+  for (const task of taskList) {
+    const rows = (byTask.get(task.id) || []).slice().sort(
+      (a, b) => (a.startedAt || 0) - (b.startedAt || 0)
+    );
+    html += renderTaskCard(task, rows);
+  }
+
+  for (const tid of orphanTaskIds) {
+    const rows = byTask.get(tid).slice().sort(
+      (a, b) => (a.startedAt || 0) - (b.startedAt || 0)
+    );
+    const startedAt = rows[0]?.startedAt || Date.now();
+    html += renderTaskCard(
+      {
+        id: tid,
+        trigger: 'manual',
+        state: 'done',
+        startedAt,
+        finishedAt: rows[rows.length - 1]?.finishedAt || startedAt,
+        total: rows.length,
+        success: rows.filter((r) => r.status === 'success').length,
+        failed: rows.filter((r) => ['failed', 'cf_timeout', 'need_login'].includes(r.status)).length,
+        skipped: rows.filter((r) => r.status === 'skipped').length,
+        orphan: true,
+      },
+      rows
+    );
+  }
+
+  if (legacy.length) {
+    html += `<div class="task-card legacy">
+      <div class="task-head">
+        <div>
+          <span class="task-title">历史记录（按单站点）</span>
+          <span class="task-sub">升级前 / 未归档的单站点日志，共 ${legacy.length} 条</span>
+        </div>
+      </div>
+      ${renderLogTable(legacy.slice().sort((a,b) => (b.finishedAt||0) - (a.finishedAt||0)))}
+    </div>`;
+  }
+
+  html += '</div>';
+  root.innerHTML = html;
+}
+
+function renderTaskCard(task, rows) {
+  const triggerLabel = TASK_TRIGGER_LABEL[task.trigger] || '任务';
+  const stateLabel =
+    task.state === 'running'
+      ? '运行中'
+      : task.state === 'aborted'
+      ? '已中止'
+      : '已完成';
+  const stateCls =
+    task.state === 'running'
+      ? 'running'
+      : task.state === 'aborted'
+      ? 'aborted'
+      : task.failed > 0
+      ? 'has-fail'
+      : 'ok';
+  const started = formatTime(task.startedAt);
+  const duration =
+    task.finishedAt && task.startedAt
+      ? formatDuration(task.finishedAt - task.startedAt)
+      : task.state === 'running'
+      ? '进行中…'
+      : '-';
+
+  const summaryChips = [
+    `<span class="chip chip-total">共 ${task.total || rows.length}</span>`,
+    `<span class="chip chip-ok">成功 ${task.success ?? 0}</span>`,
+    task.failed ? `<span class="chip chip-fail">失败 ${task.failed}</span>` : '',
+    task.skipped ? `<span class="chip chip-skip">跳过 ${task.skipped}</span>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  return `
+    <div class="task-card ${stateCls}">
+      <div class="task-head">
+        <div class="task-head-main">
+          <span class="task-title">${escapeHtml(triggerLabel)}</span>
+          <span class="task-state state-${stateCls}">${stateLabel}</span>
+          ${task.orphan ? '<span class="task-state state-aborted">未归档</span>' : ''}
+        </div>
+        <div class="task-head-meta">
+          <span class="task-time">开始 ${escapeHtml(started)}</span>
+          <span class="task-dur">耗时 ${escapeHtml(duration)}</span>
+          ${summaryChips}
+        </div>
+      </div>
+      ${renderLogTable(rows)}
+    </div>
+  `;
+}
+
+function renderLogTable(rows) {
+  if (!rows.length) {
+    return '<div class="empty-hint compact">本任务无站点记录</div>';
+  }
+  const body = rows
     .map((log) => {
       return `<tr>
-        <td>${escapeHtml(formatTime(log.finishedAt || log.startedAt))}</td>
-        <td>${escapeHtml(log.siteName || log.siteId)}</td>
-        <td><span class="badge ${log.status}">${escapeHtml(STATUS_LABEL[log.status] || log.status)}</span></td>
-        <td>${escapeHtml(log.message || '')}</td>
-        <td>${log.cfWaitedMs ? log.cfWaitedMs + 'ms' : '-'}</td>
+        <td class="col-time">${escapeHtml(formatTime(log.finishedAt || log.startedAt))}</td>
+        <td class="col-site">${escapeHtml(log.siteName || log.siteId)}</td>
+        <td class="col-status"><span class="badge ${log.status}">${escapeHtml(STATUS_LABEL[log.status] || log.status)}</span></td>
+        <td class="col-msg">${escapeHtml(log.message || '')}</td>
+        <td class="col-cf">${log.cfWaitedMs ? log.cfWaitedMs + 'ms' : '-'}</td>
       </tr>`;
     })
     .join('');
-  root.innerHTML = `<table>
-    <thead><tr>
-      <th>时间</th><th>站点</th><th>状态</th><th>消息</th><th>CF等待</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  return `<div class="log-scroll">
+    <table class="task-table">
+      <thead><tr>
+        <th class="col-time">时间</th>
+        <th class="col-site">站点</th>
+        <th class="col-status">状态</th>
+        <th class="col-msg">消息</th>
+        <th class="col-cf">CF 等待</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  </div>`;
+}
+
+function formatDuration(ms) {
+  if (!ms || ms < 0) return '-';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return `${m} 分 ${rs} 秒`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return `${h} 时 ${rm} 分`;
 }
 
 async function onClearLogs() {

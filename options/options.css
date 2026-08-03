@@ -90,8 +90,8 @@ html, body {
 }
 
 .main {
-  padding: 24px 28px 48px;
-  max-width: 1100px;
+  padding: 24px 32px 48px;
+  min-width: 0;
 }
 
 .tab { display: none; }
@@ -155,11 +155,42 @@ html, body {
 .btn.lg { padding: 12px 20px; font-size: 15px; }
 .btn.block { width: 100%; }
 
+/* —— 顶部统计 —— */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.stat-num {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.text-blue { color: var(--primary); }
+.text-green { color: #16a34a; }
+.text-red { color: var(--danger); }
+.text-amber { color: #b45309; }
+
 /* —— 左右分栏 —— */
 .split {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 16px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 
@@ -174,7 +205,7 @@ html, body {
   overflow: hidden;
   position: sticky;
   top: 16px;
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 200px);
   display: flex;
   flex-direction: column;
 }
@@ -324,6 +355,63 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.detail-head {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+.detail-main { min-width: 0; }
+.detail-main h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-url {
+  display: inline-block;
+  color: rgba(255,255,255,0.78);
+  font-size: 12.5px;
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-url:hover { color: #fff; text-decoration: underline; }
+.detail-meta {
+  display: flex;
+  gap: 18px;
+  flex-shrink: 0;
+}
+.meta-item { text-align: right; }
+.meta-label {
+  display: block;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+.meta-value {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.meta-value.badge-like {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
 }
 
 .card {
@@ -770,30 +858,121 @@ html, body {
 
 /* 日志 / 设置 / IO */
 .log-table {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
-.log-table table {
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.task-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid #16a34a;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.task-card.has-fail { border-left-color: #dc2626; }
+.task-card.running { border-left-color: #2563eb; }
+.task-card.aborted, .task-card.legacy { border-left-color: #94a3b8; }
+
+.task-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #fff 100%);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.task-head-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.task-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.task-state {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+.task-state.state-ok { background: #dcfce7; color: #166534; }
+.task-state.state-has-fail { background: #fee2e2; color: #991b1b; }
+.task-state.state-running { background: #dbeafe; color: #1e40af; }
+.task-state.state-aborted { background: #f1f5f9; color: #64748b; }
+
+.task-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+.chip-ok { background: #dcfce7; color: #166534; }
+.chip-fail { background: #fee2e2; color: #991b1b; }
+.chip-skip { background: #f1f5f9; color: #64748b; }
+
+.log-scroll {
+  overflow-x: auto;
+}
+.task-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-
-.log-table th,
-.log-table td {
-  padding: 12px 14px;
+.task-table th,
+.task-table td {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
 }
-
-.log-table th {
+.task-table tbody tr:last-child td { border-bottom: 0; }
+.task-table tbody tr:hover { background: #f8fafc; }
+.task-table th {
   background: #f8fafc;
-  position: sticky;
-  top: 0;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
+.col-time { width: 155px; white-space: nowrap; color: var(--muted); }
+.col-site { width: 180px; font-weight: 600; }
+.col-status { width: 110px; }
+.col-cf { width: 90px; color: var(--muted); }
+.col-msg { color: #334155; }
 
 .settings-form { max-width: 720px; }
 
@@ -819,10 +998,15 @@ html, body {
   .list-panel { position: static; max-height: 240px; }
   .step-row { grid-template-columns: 1fr 1fr; }
   .grid-2, .io-grid { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { height: auto; position: relative; }
   .step-row { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-head { flex-direction: column; align-items: flex-start; }
+  .detail-meta { flex-wrap: wrap; }
+  .meta-item { text-align: left; }
 }
