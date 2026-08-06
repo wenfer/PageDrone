@@ -31,6 +31,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
       - name: Resolve version
         id: ver
         shell: bash
@@ -42,12 +51,15 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
-            VERSION=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+            VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
           fi
           TAG="v${VERSION}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Resolved version=${VERSION} tag=${TAG}"
+
+      - name: Build (WXT + React)
+        run: npm run build
 
       - name: Sync manifest version
         shell: bash
@@ -57,14 +69,15 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json, os
-          path = "manifest.json"
-          with open(path, "r", encoding="utf-8") as f:
-              data = json.load(f)
-          data["version"] = os.environ["VERSION"]
-          with open(path, "w", encoding="utf-8") as f:
-              json.dump(data, f, ensure_ascii=False, indent=2)
-              f.write("\n")
-          print("manifest version ->", data["version"])
+          # WXT 从 package.json 读取默认版本；tag 构建时以解析出的版本覆盖最终清单。
+          for path in (".output/chrome-mv3/manifest.json",):
+              with open(path, "r", encoding="utf-8") as f:
+                  data = json.load(f)
+              data["version"] = os.environ["VERSION"]
+              with open(path, "w", encoding="utf-8") as f:
+                  json.dump(data, f, ensure_ascii=False, indent=2)
+                  f.write("\n")
+              print(path, "version ->", data["version"])
           PY
 
       - name: Stage extension files
@@ -74,21 +87,20 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           NAME="auto-checkin-v${VERSION}"
-          STAGE="dist/${NAME}"
-          mkdir -p dist
+          # WXT 的 Chrome MV3 可加载产物固定在 .output/chrome-mv3/。
+          STAGE="stage/${NAME}"
+          mkdir -p stage
           rm -rf "$STAGE"
           rsync -a \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude 'dist' \
-            --exclude 'node_modules' \
-            --exclude '.claude' \
-            --exclude '.gitignore' \
-            --exclude 'scripts' \
-            --exclude 'fixtures' \
-            --exclude 'market' \
             --exclude '*.pem' \
-            ./ "$STAGE/"
+            --exclude '*.ts' \
+            --exclude '*.map' \
+            --exclude '*.md' \
+            --exclude '*.docx' \
+            --exclude 'patent-fig-*' \
+            --exclude '.DS_Store' \
+            .output/chrome-mv3/ "$STAGE/"
+          # 附带说明（pack.sh 同款）
           cp -f README.md "$STAGE/" 2>/dev/null || true
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           echo "stage=${STAGE}" >> "$GITHUB_OUTPUT"
@@ -101,7 +113,9 @@ jobs:
         run: |
           set -euo pipefail
           NAME="${{ steps.stage.outputs.name }}"
-          (cd dist && zip -rq "${NAME}.zip" "${NAME}" -x "*.DS_Store")
+          mkdir -p dist
+          # 在 stage/ 内打包，使 zip 顶层目录是 ${NAME}/，不带 stage/ 前缀（与历史发版产物一致）。
+          (cd stage && zip -rq "../dist/${NAME}.zip" "${NAME}" -x "*.DS_Store")
           echo "zip_path=dist/${NAME}.zip" >> "$GITHUB_OUTPUT"
           ls -lh "dist/${NAME}.zip"
 

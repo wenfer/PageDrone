@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>auto-page - 流程画布</title>
+  <link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 左侧：节点库 + 任务库 -->
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <strong>auto-page</strong>
+        <span class="muted">画布编排</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">控制节点</div>
+        <div id="palette-control" class="palette"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">浏览器节点</div>
+        <div id="palette-browser" class="palette"></div>
+      </div>
+
+      <div class="sidebar-section grow">
+        <div class="sidebar-title">
+          任务库
+          <button id="btnRefreshProcs" class="link-btn" type="button" title="刷新">⟳</button>
+        </div>
+        <input id="procFilter" class="filter-input" type="search" placeholder="过滤任务..." />
+        <div id="procList" class="proc-list"></div>
+      </div>
+    </aside>
+
+    <!-- 中间：画布 -->
+    <main class="canvas-area">
+      <div class="topbar">
+        <select id="flowSelect" class="flow-select"></select>
+        <button id="btnNewFlow" type="button" class="btn">＋ 新建流程</button>
+        <button id="btnSaveFlow" type="button" class="btn btn-primary">💾 保存</button>
+        <button id="btnRunFlow" type="button" class="btn btn-success">▶ 运行</button>
+        <button id="btnStopFlow" type="button" class="btn btn-error">■ 停止</button>
+        <span class="spacer"></span>
+        <button id="btnDeleteFlow" type="button" class="btn btn-ghost btn-error">🗑 删除流程</button>
+        <button id="btnExport" type="button" class="btn">📤 导出</button>
+        <button id="btnImport" type="button" class="btn">📥 导入</button>
+        <input id="importFile" type="file" accept="application/json,.json" class="hidden" />
+        <button id="btnZoomOut" type="button" class="btn btn-square btn-sm">−</button>
+        <span id="zoomLabel" class="zoom-label">100%</span>
+        <button id="btnZoomIn" type="button" class="btn btn-square btn-sm">＋</button>
+        <button id="btnZoomReset" type="button" class="btn btn-square btn-sm">⊙</button>
+      </div>
+
+      <div id="canvas" class="canvas" tabindex="0">
+        <div id="canvasInner" style="position:relative; width:4000px; height:3000px; transform-origin:0 0;">
+          <svg id="edges" xmlns="http://www.w3.org/2000/svg" style="position:absolute; top:0; left:0; width:4000px; height:3000px; pointer-events:none; overflow:visible;">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+        <div id="gridHint" class="grid-hint">
+          拖入左侧节点或任务 · 从端口拖出建立连线 · 双击节点编辑 · 右键节点/连线操作
+        </div>
+      </div>
+    </main>
+
+    <!-- 右侧：属性 / 日志 -->
+    <aside class="rightbar">
+      <div class="tabs tabs-border" role="tablist">
+        <button class="tab tab-active" role="tab" data-tab="props">属性</button>
+        <button class="tab" role="tab" data-tab="vars">变量</button>
+        <button class="tab" role="tab" data-tab="logs">日志</button>
+      </div>
+
+      <section class="tab-panel active" id="panel-props">
+        <div id="propsEmpty" class="empty">选择一个节点查看属性</div>
+        <div id="propsBody" class="hidden"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-vars">
+        <div id="varsBody" class="vars-body">
+          <div class="empty">运行后可查看变量</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="panel-logs">
+        <div class="log-toolbar">
+          <button id="btnClearLog" type="button" class="btn btn-sm">清空</button>
+        </div>
+        <div id="logBody" class="log-body"></div>
+      </section>
+    </aside>
+  </div>
+
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

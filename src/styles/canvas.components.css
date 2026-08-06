@@ -1,0 +1,420 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  /* 画布 chrome 比设置页密集（节点宽度被 JS 硬编码在 170–240px），
+     这里保留 13px，不跟随设置页的 14px。 */
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.app { display: flex; height: 100vh; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 240px;
+  background: var(--color-base-100);
+  border-right: 1px solid var(--color-base-300);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.sidebar-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-base-300);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-head strong { font-size: 15px; font-weight: 600; }
+.muted { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 11px; }
+
+.sidebar-section {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.sidebar-section.grow { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.link-btn { background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 13px; padding: 0; }
+.link-btn:hover { text-decoration: underline; }
+
+.palette { display: flex; flex-direction: column; gap: 4px; }
+.palette-item {
+  padding: 8px;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  cursor: grab;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+.palette-item:hover { background: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); border-color: color-mix(in oklab, var(--color-primary) 30%, var(--color-base-100)); }
+.palette-item:active { cursor: grabbing; }
+.palette-item .pi-icon { font-size: 14px; }
+
+.filter-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  font-size: 12px;
+  font-family: inherit;
+  margin-bottom: 8px;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+.filter-input:focus { outline: 2px solid color-mix(in oklab, var(--color-primary) 40%, transparent); outline-offset: -1px; }
+.proc-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.proc-item {
+  padding: 8px;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  cursor: grab;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.proc-item:hover { background: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); border-color: color-mix(in oklab, var(--color-primary) 30%, var(--color-base-100)); }
+.proc-item .pi-name { font-weight: 500; }
+.proc-item .pi-meta { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 10px; }
+.proc-item .pi-kind {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: var(--radius-badge);
+  font-size: 10px;
+  line-height: 16px;
+  background: color-mix(in oklab, var(--color-primary) 15%, var(--color-base-100));
+  color: var(--color-primary);
+  margin-right: 4px;
+}
+.proc-item .pi-kind.login { background: color-mix(in oklab, var(--color-warning) 15%, var(--color-base-100)); color: var(--color-warning); }
+
+/* ---------- Canvas ---------- */
+.canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  height: 48px;
+  background: var(--color-base-100);
+  border-bottom: 1px solid var(--color-base-300);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.flow-select {
+  padding: 4px 12px;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 180px;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+.spacer { flex: 1; }
+.zoom-label { font-size: 11px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); min-width: 44px; text-align: center; }
+
+/*
+ * 按钮外观全部交给 daisyUI（btn / btn-primary / btn-ghost / btn-error / btn-sm ...）。
+ * 画布 chrome 比设置页密集，这里只压一档默认尺寸，不重定义配色——
+ * 重定义会和 daisyUI 的修饰符打架。
+ */
+.topbar .btn,
+.log-toolbar .btn,
+.tab-panel .btn,
+.sidebar .btn {
+  --size-field: 0.22rem;
+  font-size: 12px;
+}
+
+.canvas {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background-color: var(--color-base-200);
+  background-image:
+    radial-gradient(circle, var(--color-base-300) 1px, transparent 1px);
+  background-size: 20px 20px;
+  outline: none;
+  cursor: default;
+}
+.canvas.panning { cursor: grabbing; }
+
+#edges {
+  position: absolute;
+  top: 0; left: 0;
+  width: 4000px;
+  height: 3000px;
+  pointer-events: none;
+  overflow: visible;
+}
+#edges path.edge {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  stroke-width: 2;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+#edges path.edge:hover { stroke: var(--color-primary); stroke-width: 3; }
+#edges path.edge.selected { stroke: var(--color-primary); stroke-width: 3; }
+#edges path.edge.temp { stroke: var(--color-primary); stroke-dasharray: 5,4; pointer-events: none; }
+#edges circle.edge-handle {
+  fill: var(--color-base-100);
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  cursor: grab;
+  pointer-events: all;
+}
+.edge-label {
+  font-size: 10px;
+  fill: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+.edge-label-bg { fill: var(--color-base-200); }
+
+.grid-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: color-mix(in oklab, var(--color-base-100) 90%, transparent);
+  padding: 4px 12px;
+  border-radius: var(--radius-badge);
+  font-size: 11px;
+  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  pointer-events: none;
+  border: 1px solid var(--color-base-300);
+}
+
+/* ---------- Nodes ---------- */
+/*
+ * ⚠️ min-width / max-width 是承重几何：editor.js 的 portPos() 与 fitView()
+ * 依赖 170 / 240 这两个数，不要改。
+ */
+.node {
+  position: absolute;
+  background: var(--color-base-100);
+  border: 2px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  min-width: 170px;
+  max-width: 240px;
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  user-select: none;
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+.node.selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 15%, transparent); }
+.node.running { border-color: var(--color-warning); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-warning) 25%, transparent); }
+.node.done { border-color: var(--color-success); }
+.node.failed { border-color: var(--color-error); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error) 20%, transparent); }
+
+.node-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-base-300);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 减去 2px 边框，避免头部背景在圆角处溢出节点轮廓 */
+  border-radius: calc(var(--radius-box) - 2px) calc(var(--radius-box) - 2px) 0 0;
+  cursor: grab;
+}
+.node-header .nh-icon { font-size: 13px; }
+.node-header .nh-type {
+  margin-left: auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+}
+
+.node-body { padding: 8px 12px; font-size: 11px; color: var(--color-base-content); min-height: 24px; word-break: break-word; }
+.node-body .nb-line { display: flex; gap: 4px; margin: 2px 0; }
+.node-body .nb-k { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); min-width: 36px; }
+.node-body .nb-v { color: var(--color-base-content); flex: 1; word-break: break-all; }
+.node-body .nb-empty { color: color-mix(in oklab, var(--color-base-content) 40%, transparent); font-style: italic; }
+
+.node.type-start { border-color: var(--color-success); }
+.node.type-start .node-header { background: color-mix(in oklab, var(--color-success) 12%, var(--color-base-100)); color: var(--color-success); border-color: color-mix(in oklab, var(--color-success) 35%, var(--color-base-100)); }
+.node.type-end { border-color: var(--color-error); }
+.node.type-end .node-header { background: color-mix(in oklab, var(--color-error) 12%, var(--color-base-100)); color: var(--color-error); border-color: color-mix(in oklab, var(--color-error) 35%, var(--color-base-100)); }
+.node.type-condition { border-color: var(--color-warning); }
+.node.type-condition .node-header { background: color-mix(in oklab, var(--color-warning) 12%, var(--color-base-100)); color: var(--color-warning); border-color: color-mix(in oklab, var(--color-warning) 35%, var(--color-base-100)); }
+.node.type-loop { border-color: var(--color-secondary); }
+.node.type-loop .node-header { background: color-mix(in oklab, var(--color-secondary) 12%, var(--color-base-100)); color: var(--color-secondary); border-color: color-mix(in oklab, var(--color-secondary) 35%, var(--color-base-100)); }
+.node.type-parallel { border-color: var(--color-info); }
+.node.type-parallel .node-header { background: color-mix(in oklab, var(--color-info) 12%, var(--color-base-100)); color: var(--color-info); border-color: color-mix(in oklab, var(--color-info) 35%, var(--color-base-100)); }
+/* 延时：warning 系，与「条件分支」同色相但更淡，靠 node-body 里的 “等待 N ms” 区分 */
+.node.type-delay { border-color: color-mix(in oklab, var(--color-warning) 70%, var(--color-base-300)); }
+.node.type-delay .node-header { background: color-mix(in oklab, var(--color-warning) 10%, var(--color-base-100)); color: var(--color-warning); border-color: color-mix(in oklab, var(--color-warning) 30%, var(--color-base-100)); }
+/* 设置变量：accent 系 */
+.node.type-variable { border-color: var(--color-accent); }
+.node.type-variable .node-header { background: color-mix(in oklab, var(--color-accent) 12%, var(--color-base-100)); color: color-mix(in oklab, var(--color-accent) 80%, var(--color-base-content)); border-color: color-mix(in oklab, var(--color-accent) 35%, var(--color-base-100)); }
+/* 记录日志：info 系，比「并行」更淡 */
+.node.type-log { border-color: color-mix(in oklab, var(--color-info) 70%, var(--color-base-300)); }
+.node.type-log .node-header { background: color-mix(in oklab, var(--color-info) 10%, var(--color-base-100)); color: var(--color-info); border-color: color-mix(in oklab, var(--color-info) 30%, var(--color-base-100)); }
+.node.type-procedure { border-color: var(--color-primary); }
+.node.type-procedure .node-header { background: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100)); color: var(--color-primary); border-color: color-mix(in oklab, var(--color-primary) 35%, var(--color-base-100)); }
+.node.type-site { border-color: var(--color-primary); }
+.node.type-site .node-header { background: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); color: var(--color-primary); border-color: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); }
+
+/*
+ * ⚠️ 承重几何：width/height/top/transform/z-index 与 left/right 偏移都被
+ * elementFromPoint() + closest('.port') 的命中判定依赖，不要改。
+ */
+.port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--color-base-100);
+  border: 2px solid color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: crosshair;
+  z-index: 2;
+  transition: background 0.1s, transform 0.1s;
+}
+.port:hover { background: var(--color-primary); border-color: var(--color-primary); transform: translateY(-50%) scale(1.25); }
+.port.input { left: -7px; }
+.port.output { right: -7px; }
+.port.has-connections { background: var(--color-primary); border-color: var(--color-primary); }
+
+/* ---------- Right panel ---------- */
+.rightbar {
+  width: 300px;
+  background: var(--color-base-100);
+  border-left: 1px solid var(--color-base-300);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+/* tabs/tab 的外观交给 daisyUI（tabs-border 风格），这里只补三等分与不收缩。 */
+.tabs {
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1;
+  font-size: 12px;
+}
+/* .tab-panel 是面板，不是 daisyUI 的 tab；显隐由 .active 控制。 */
+.tab-panel { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+.tab-panel.active { display: flex; }
+
+.empty { padding: 20px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 12px; text-align: center; }
+.hidden { display: none !important; }
+
+/*
+ * editor.js 的 hint() 直接把 .hint 挂在属性面板容器上（不一定在 .field 里），
+ * 所以这里必须有一条独立规则，.field .hint 只是它的加强版。
+ */
+.hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  margin: 0 0 12px;
+}
+
+#propsBody { padding: 12px; overflow-y: auto; flex: 1; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 11px; color: color-mix(in oklab, var(--color-base-content) 75%, transparent); margin-bottom: 4px; font-weight: 500; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 40%, transparent);
+  outline-offset: -1px;
+}
+.field textarea { resize: vertical; min-height: 60px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+.field .hint { font-size: 10px; margin: 4px 0 0; }
+.field-row { display: flex; gap: 8px; }
+.field-row .field { flex: 1; }
+
+.props-actions { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--color-base-300); }
+.props-actions .btn { flex: 1; }
+
+.vars-body { flex: 1; overflow-y: auto; padding: 12px; }
+.var-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-base-300);
+  font-size: 11px;
+  gap: 8px;
+}
+.var-row .vk { font-weight: 600; color: var(--color-primary); }
+.var-row .vv { color: var(--color-base-content); text-align: right; word-break: break-all; }
+
+.log-toolbar { padding: 8px 12px; border-bottom: 1px solid var(--color-base-300); }
+.log-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--color-base-200);
+}
+.log-line { white-space: pre-wrap; word-break: break-all; margin: 2px 0; }
+.log-line .ll-time { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); margin-right: 8px; }
+.log-line.info { color: var(--color-base-content); }
+.log-line.warn { color: var(--color-warning); }
+.log-line.error { color: var(--color-error); }
+.log-line.success { color: var(--color-success); }
+
+/* ---------- Context menu ---------- */
+.ctx-menu {
+  position: fixed;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--color-base-content) 16%, transparent);
+  padding: 4px;
+  z-index: 1000;
+  min-width: 144px;
+}
+.ctx-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-selector);
+}
+.ctx-menu button:hover { background: var(--color-base-200); }
+.ctx-menu button.danger { color: var(--color-error); }
+.ctx-menu hr { border: none; border-top: 1px solid var(--color-base-300); margin: 4px 0; }

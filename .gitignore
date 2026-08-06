@@ -8,8 +8,10 @@ Thumbs.db
 
 # Dependencies / build
 node_modules/
+.wxt/
 dist/
 build/
+releases/
 *.zip
 !releases/.gitkeep
 

@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>auto-page - 网页 RPA 设置</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="../icons/icon48.png" alt="" width="28" height="28" />
+          <div>
+            <strong>auto-page</strong>
+            <div class="sub">网页 RPA · 设置与管理</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-tab="sites">站点管理</button>
+          <button class="nav-item" data-tab="procedures">任务库</button>
+          <button class="nav-item" data-tab="agent">智能代理</button>
+          <button class="nav-item" data-tab="market">任务市场</button>
+          <button class="nav-item" data-tab="flows">流程</button>
+          <button class="nav-item" data-tab="logs">自动化日志</button>
+          <button class="nav-item" data-tab="settings">全局设置</button>
+          <button class="nav-item" data-tab="io">导入 / 导出</button>
+        </nav>
+        <div class="sidebar-foot">
+          <button id="btnRunAll" class="btn btn-primary btn-block">全部自动化</button>
+          <button id="btnStop" class="btn btn-outline btn-error btn-block">强制停止</button>
+          <div class="sidebar-version" id="versionLabel">v…</div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <!-- 站点 -->
+        <section id="tab-sites" class="tab-panel active">
+          <div class="toolbar">
+            <h2>站点管理</h2>
+            <div class="toolbar-actions">
+              <button id="btnNewSite" class="btn btn-primary">＋ 新建站点</button>
+            </div>
+          </div>
+
+          <div class="stats" id="siteStats">
+            <div class="stat">
+              <div class="stat-value" id="statTotal">0</div>
+              <div class="stat-title">总站点</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value text-blue" id="statEnabled">0</div>
+              <div class="stat-title">已启用</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value text-amber" id="statScheduled">0</div>
+              <div class="stat-title">定时中</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value text-green" id="statSuccess">0</div>
+              <div class="stat-title">今日成功</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value text-red" id="statFailed">0</div>
+              <div class="stat-title">异常站点</div>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="panel list-panel">
+              <div class="panel-title">
+                <span>我的站点</span>
+                <span class="count" id="siteCount">0</span>
+              </div>
+              <div id="siteList" class="site-list"></div>
+            </div>
+
+            <div class="editor-wrap">
+              <div id="editorEmpty" class="empty-hint panel">
+                选择左侧站点进行编辑，或点击「新建站点」
+              </div>
+
+              <form id="siteForm" class="site-form hidden">
+                <div class="detail-head" id="siteDetailHead">
+                  <div class="detail-main">
+                    <h3 id="detailTitle">站点</h3>
+                    <a id="detailUrl" class="detail-url" target="_blank" rel="noreferrer"></a>
+                  </div>
+                  <div class="detail-meta">
+                    <div class="meta-item">
+                      <span class="meta-label">最近结果</span>
+                      <span class="meta-value" id="detailLast">-</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">定时</span>
+                      <span class="meta-value" id="detailSched">-</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ① 基本信息 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">1</span>
+                    <div>
+                      <h3>基本信息</h3>
+                      <p>站点名称与目标网址</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="field">
+                      <label for="f-name">名称</label>
+                      <input id="f-name" name="name" required placeholder="例如：某论坛每日任务" />
+                    </div>
+                    <div class="field">
+                      <label for="f-url">目标网址</label>
+                      <input id="f-url" name="url" required type="url" placeholder="https://example.com/checkin" />
+                    </div>
+                    <div class="checks">
+                      <label class="check"><input name="enabled" type="checkbox" checked /> 启用此站点</label>
+                      <label class="check"><input name="openInBackground" type="checkbox" checked /> 后台打开标签</label>
+                      <label class="check"><input name="keepTabOnError" type="checkbox" checked /> 失败时保留标签</label>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ② 任务 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">2</span>
+                    <div>
+                      <h3>任务</h3>
+                      <p>选择一个任务（步骤或脚本在「任务库」中维护）</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="proc-pick">
+                      <select name="checkinProcedureId" id="f-checkinProc" class="proc-select"></select>
+                      <button type="button" id="btnNewCheckinProc" class="btn btn-sm">＋ 新建</button>
+                      <button type="button" id="btnEditCheckinProc" class="btn btn-sm btn-ghost">编辑</button>
+                    </div>
+                    <div class="checks">
+                      <label class="check"><input type="radio" name="mode" value="steps" checked /> 按步骤执行</label>
+                      <label class="check"><input type="radio" name="mode" value="script" /> 运行自定义脚本</label>
+                    </div>
+                    <div id="checkinProcPreview" class="proc-preview"></div>
+                  </div>
+                </section>
+
+                <!-- ③ 定时 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">3</span>
+                    <div>
+                      <h3>定时执行</h3>
+                      <p>每天固定时间自动执行</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <label class="check big">
+                      <input name="scheduleEnabled" type="checkbox" /> 开启每日自动执行
+                    </label>
+                    <div class="time-row">
+                      <span class="time-label">执行时间</span>
+                      <input name="scheduleHour" type="number" min="0" max="23" value="8" class="time-input" />
+                      <span class="time-colon">:</span>
+                      <input name="scheduleMinute" type="number" min="0" max="59" value="5" class="time-input" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ④ 登录任务 -->
+                <section class="card card-muted">
+                  <header class="card-head">
+                    <span class="card-num">4</span>
+                    <div>
+                      <h3>登录任务 <span class="tag">可选</span></h3>
+                      <p>需要登录 / OAuth 的站点选择一个登录任务，执行中掉线会自动重登</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="proc-pick">
+                      <select name="loginProcedureId" id="f-loginProc" class="proc-select">
+                        <option value="">（不使用登录任务）</option>
+                      </select>
+                      <button type="button" id="btnNewLoginProc" class="btn btn-sm">＋ 新建</button>
+                      <button type="button" id="btnEditLoginProc" class="btn btn-sm btn-ghost">编辑</button>
+                    </div>
+                    <div id="loginProcPreview" class="proc-preview"></div>
+                  </div>
+                </section>
+
+                <!-- ⑤ 高级超时 -->
+                <section class="card card-muted">
+                  <header class="card-head">
+                    <span class="card-num">5</span>
+                    <div>
+                      <h3>超时设置 <span class="tag">高级</span></h3>
+                      <p>一般保持默认即可</p>
+                    </div>
+                  </header>
+                  <div class="card-body grid-2">
+                    <div class="field">
+                      <label>防护 / CF 等待（毫秒）</label>
+                      <input name="cfTimeoutMs" type="number" min="5000" step="1000" />
+                    </div>
+                    <div class="field">
+                      <label>页面加载超时（毫秒）</label>
+                      <input name="pageLoadTimeoutMs" type="number" min="5000" step="1000" />
+                    </div>
+                  </div>
+                </section>
+
+                <div class="form-footer">
+                  <div class="form-footer-left">
+                    <button type="submit" class="btn btn-primary btn-lg">保存</button>
+                    <button type="button" id="btnTestSite" class="btn btn-lg">立即测试任务</button>
+                  </div>
+                  <button type="button" id="btnDeleteSite" class="btn btn-error btn-ghost">删除站点</button>
+                </div>
+                <p id="formMsg" class="form-msg"></p>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- 任务库 -->
+        <section id="tab-procedures" class="tab-panel">
+          <div class="toolbar">
+            <h2>任务库</h2>
+            <div class="toolbar-actions">
+              <div class="seg" id="procKindSeg">
+                <button type="button" class="seg-btn active" data-kind="">全部</button>
+                <button type="button" class="seg-btn" data-kind="checkin">任务</button>
+                <button type="button" class="seg-btn" data-kind="login">登录</button>
+              </div>
+              <input id="procSearch" class="search-input" placeholder="搜索任务名称…" />
+              <button id="btnExploreGenerate" class="btn" type="button">🤖 AI 探索生成</button>
+              <button id="btnRecordGenerate" class="btn" type="button">⏺ 录制生成</button>
+              <button id="btnNewProc" class="btn btn-primary">＋ 新建任务</button>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="panel list-panel">
+              <div class="panel-title">
+                <span>任务</span>
+                <span class="count" id="procCount">0</span>
+              </div>
+              <div id="procList" class="proc-list"></div>
+            </div>
+
+            <div class="editor-wrap">
+              <div id="procEditorEmpty" class="empty-hint panel">
+                选择左侧任务进行编辑，或点击「新建任务」
+              </div>
+
+              <form id="procForm" class="site-form hidden">
+                <div class="detail-head proc-detail">
+                  <div class="detail-main">
+                    <h3 id="procDetailTitle">任务</h3>
+                    <div class="detail-url" id="procDetailMeta"></div>
+                  </div>
+                </div>
+
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">i</span>
+                    <div>
+                      <h3>基本信息</h3>
+                      <p>任务名称与类型</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="grid-2">
+                      <div class="field">
+                        <label>名称</label>
+                        <input name="name" required placeholder="例如：通用 Discuz! 任务" />
+                      </div>
+                      <div class="field">
+                        <label>类型</label>
+                        <select name="kind" id="procKind">
+                          <option value="checkin">任务</option>
+                          <option value="login">登录任务</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label>简介</label>
+                      <input name="description" placeholder="这个任务做什么（分享时会展示）" />
+                    </div>
+                    <div class="grid-2">
+                      <div class="field">
+                        <label>作者</label>
+                        <input name="author" placeholder="可选" />
+                      </div>
+                      <div class="field">
+                        <label>版本</label>
+                        <input name="version" placeholder="1.0.0" />
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label>主页 / 文档</label>
+                      <input name="homepage" placeholder="https://…" />
+                    </div>
+                  </div>
+                </section>
+
+                <!-- 检测规则 -->
+                <section class="card" id="procDetectCard">
+                  <header class="card-head">
+                    <span class="card-num">✓</span>
+                    <div>
+                      <h3 id="procDetectTitle">结果判定</h3>
+                      <p id="procDetectDesc">根据页面文字判断任务是否成功</p>
+                    </div>
+                  </header>
+                  <div class="card-body" id="procDetectBody"></div>
+                </section>
+
+                <!-- 步骤 / 脚本 -->
+                <section class="card">
+                  <header class="card-head">
+                    <span class="card-num">▶</span>
+                    <div>
+                      <h3 id="procActionTitle">执行步骤</h3>
+                      <p>按顺序操作页面</p>
+                    </div>
+                  </header>
+                  <div class="card-body">
+                    <div class="mode-switch" id="procModeSeg">
+                      <label class="mode-opt">
+                        <input type="radio" name="procMode" value="steps" checked />
+                        <span>可视化步骤</span>
+                      </label>
+                      <label class="mode-opt">
+                        <input type="radio" name="procMode" value="script" />
+                        <span>自定义脚本</span>
+                      </label>
+                    </div>
+
+                    <div id="procStepsBlock" class="mode-block">
+                      <div class="section-toolbar">
+                        <span class="section-label">执行步骤（按顺序）</span>
+                        <div class="section-actions">
+                          <button type="button" id="btnProcToggleHelp" class="btn btn-ghost btn-sm">使用说明</button>
+                          <button type="button" id="btnProcAddStep" class="btn btn-sm">＋ 添加步骤</button>
+                        </div>
+                      </div>
+                      <details class="help-panel" id="procStepsHelp">
+                        <summary>如何填写步骤？点开查看</summary>
+                        <div class="help-body">
+                          <p>扩展会按顺序操作网页。最常见只需 <strong>2 步</strong>：</p>
+                          <ol>
+                            <li><strong>点击元素</strong> — 填操作按钮的选择器（CSS 或 XPath）</li>
+                            <li><strong>等待文字出现</strong> — 附加栏填「操作成功」等提示语</li>
+                          </ol>
+                          <p>支持 CSS（如 <code>.checkin</code>）和 XPath（如 <code>//button[contains(.,"任务")]</code>）。</p>
+                        </div>
+                      </details>
+                      <div id="procStepsList" class="steps-list"></div>
+                    </div>
+
+                    <div class="last-result-row">
+                      <span class="section-label">最近一次执行</span>
+                      <div id="procLastResultBody"></div>
+                    </div>
+
+                    <div id="procScriptBlock" class="mode-block hidden">
+                      <div class="section-toolbar">
+                        <span class="section-label">脚本内容</span>
+                        <button type="button" id="btnProcResetScript" class="btn btn-ghost btn-sm">恢复模板</button>
+                      </div>
+                      <textarea name="script" rows="12" spellcheck="false" class="code"></textarea>
+                      <p class="hint">需 <code>return { ok, message }</code>，支持 async/await。</p>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="form-footer">
+                  <div class="form-footer-left">
+                    <button type="submit" class="btn btn-primary btn-lg">保存任务</button>
+                    <button type="button" id="btnRunProcWatch" class="btn btn-lg">▶ 试运行（带自愈介入）</button>
+                    <button type="button" id="btnExportProc" class="btn btn-lg">导出 JSON</button>
+                    <button type="button" id="btnDuplicateProc" class="btn btn-lg btn-ghost">复制副本</button>
+                  </div>
+                  <button type="button" id="btnDeleteProc" class="btn btn-error btn-ghost">删除任务</button>
+                </div>
+                <p id="procFormMsg" class="form-msg"></p>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- 任务市场 -->
+        <section id="tab-market" class="tab-panel">
+          <div class="toolbar">
+            <h2>任务市场</h2>
+            <div class="toolbar-actions">
+              <div class="seg" id="marketKindSeg">
+                <button type="button" class="seg-btn active" data-kind="">全部</button>
+                <button type="button" class="seg-btn" data-kind="checkin">任务</button>
+                <button type="button" class="seg-btn" data-kind="login">登录</button>
+              </div>
+              <input id="marketSearch" class="search-input" placeholder="搜索市场…" />
+              <button id="btnRefreshMarket" class="btn">刷新</button>
+            </div>
+          </div>
+          <div class="market-hint">
+            市场源：<input id="marketUrl" class="market-url-input" />
+            <button id="btnSaveMarketUrl" class="btn btn-sm">保存</button>
+            <a id="marketDocLink" href="#" target="_blank" rel="noreferrer" class="market-doc">如何搭建自己的市场？</a>
+          </div>
+          <div id="marketList" class="market-list">
+            <div class="empty-hint">点击「刷新」加载市场目录</div>
+          </div>
+        </section>
+
+        <!-- 日志 -->
+        <section id="tab-logs" class="tab-panel">
+          <div class="toolbar">
+            <h2>自动化日志</h2>
+            <div class="toolbar-actions">
+              <button id="btnClearLogs" class="btn btn-error">清空日志</button>
+            </div>
+          </div>
+          <div id="logTable" class="log-table panel"></div>
+        </section>
+
+        <!-- 智能代理（对话式创建任务与流程） -->
+        <section id="tab-agent" class="tab-panel">
+          <div class="toolbar">
+            <h2>智能代理</h2>
+            <div class="toolbar-actions">
+              <button id="btnAgentAbort" class="btn btn-outline btn-error" type="button" disabled>停止</button>
+              <button id="btnAgentReset" class="btn" type="button">清空对话</button>
+            </div>
+          </div>
+          <div class="hint agent-intro">
+            用自然语言描述你想要的自动化，代理会调用内置技能帮你创建<strong>任务</strong>与<strong>流程</strong>。
+            它能读取你已有的任务和站点、打开页面查看真实结构，信息不足时会反问你。
+            对话记录保存在内存中，浏览器重启或扩展重载后会清空。
+          </div>
+          <div id="agentMessages" class="chat-messages panel"></div>
+          <div id="agentProgress" class="agent-progress" hidden></div>
+          <div class="chat-input-row">
+            <textarea id="agentInput" rows="3" spellcheck="false"
+              placeholder="例如：帮我创建一个每天早上 8 点自动签到 example.com 的任务（Ctrl+Enter 发送）"></textarea>
+            <button id="btnAgentSend" class="btn btn-primary" type="button">发送</button>
+          </div>
+        </section>
+
+        <!-- 流程（画布） -->
+        <section id="tab-flows" class="tab-panel">
+          <div class="toolbar">
+            <h2>流程</h2>
+            <div class="toolbar-actions">
+              <button id="btnNewFlow" class="btn btn-primary" type="button">＋ 新建流程</button>
+              <button id="btnOpenCanvas" class="btn" type="button">在新标签页打开画布编辑器</button>
+            </div>
+          </div>
+          <div class="flow-list-hint hint">
+            流程由画布上的节点与连线组成，可编排「任务库」中的任务、站点执行以及条件 / 循环 / 并行等控制逻辑。
+          </div>
+          <div id="flowList" class="flow-list"></div>
+        </section>
+
+        <!-- 设置 -->
+        <section id="tab-settings" class="tab-panel">
+          <div class="toolbar"><h2>全局设置</h2></div>
+          <form id="settingsForm" class="settings-form card">
+            <div class="card-body stack">
+              <label class="check big"><input name="notifyOnComplete" type="checkbox" /> 全部完成后通知</label>
+              <label class="check big"><input name="notifyOnError" type="checkbox" /> 失败 / 需验证时通知</label>
+              <label class="check big"><input name="openInBackground" type="checkbox" /> 默认后台打开标签</label>
+              <div class="grid-2">
+                <div class="field">
+                  <label>站点间隔（毫秒）</label>
+                  <input name="siteGapMs" type="number" min="0" step="500" />
+                </div>
+                <div class="field">
+                  <label>日志最多保留条数</label>
+                  <input name="maxLogs" type="number" min="20" max="2000" />
+                </div>
+                <div class="field">
+                  <label>默认 CF 超时（毫秒）</label>
+                  <input name="defaultCfTimeoutMs" type="number" min="5000" step="1000" />
+                </div>
+                <div class="field">
+                  <label>人机验证宽限（毫秒）</label>
+                  <input name="cfManualGraceMs" type="number" min="0" step="1000" />
+                </div>
+              </div>
+
+              <div class="settings-subhead">🤖 AI 设置</div>
+              <p class="hint">用于「AI 探索生成任务」。API Key 仅保存在本地浏览器，不会上传到任何第三方。</p>
+              <div class="grid-2">
+                <div class="field">
+                  <label>大模型提供商</label>
+                  <select name="llmProvider" id="llmProvider">
+                    <option value="anthropic">Anthropic (Claude)</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>模型名称</label>
+                  <div class="llm-model-row">
+                    <div class="llm-model-combobox" id="llmModelCombobox">
+                      <input name="llmModel" id="llmModel" placeholder="claude-3-5-sonnet-20241022"
+                        autocomplete="off" role="combobox" aria-autocomplete="list"
+                        aria-expanded="false" aria-controls="llmModelMenu" />
+                      <button id="btnToggleModels" class="llm-model-toggle" type="button"
+                        aria-label="展开模型列表" title="展开模型列表">▾</button>
+                      <div id="llmModelMenu" class="llm-model-menu hidden" role="listbox"></div>
+                    </div>
+                    <button id="btnFetchModels" class="btn btn-sm" type="button">获取模型</button>
+                  </div>
+                  <p class="hint">可点「获取模型」自动拉取后从下拉中选择，也可直接手填模型名。</p>
+                </div>
+              </div>
+              <div class="field">
+                <label>API Key</label>
+                <input name="llmApiKey" type="password" autocomplete="off" placeholder="sk-ant-... 或 sk-..." />
+              </div>
+              <div class="field">
+                <label>自定义 Base URL（可留空）</label>
+                <input name="llmBaseUrl" id="llmBaseUrl" placeholder="留空使用官方 endpoint，如需代理可填 https://your-proxy" />
+              </div>
+              <div class="field">
+                <label>自定义请求头（可留空）</label>
+                <textarea name="llmHeaders" id="llmHeaders" rows="4" spellcheck="false"
+                  placeholder="每行一个 Key: Value，例如&#10;X-Api-Provider: my-gateway"></textarea>
+                <p class="hint">
+                  同名请求头会<strong>覆盖</strong>下方默认值；只写 <code>Key:</code> 留空值表示<strong>删除</strong>该默认头。
+                  值里可用 <code>{{apiKey}}</code> 引用上面填的 API Key。
+                </p>
+                <details class="llm-default-headers">
+                  <summary>查看当前生效的请求头（默认值 + 你的覆盖）</summary>
+                  <pre id="llmHeaderPreview" class="llm-header-preview"></pre>
+                </details>
+              </div>
+              <div class="field">
+                <label>连通性测试</label>
+                <div class="llm-test-row">
+                  <input id="llmTestPrompt" placeholder="请只回复两个字：可用" />
+                  <button id="btnTestLlm" class="btn" type="button">发送测试消息</button>
+                </div>
+                <p class="hint">会用<strong>已保存</strong>的设置真实调用一次接口，请先点「保存设置」。</p>
+                <p id="llmTestMsg" class="form-msg"></p>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">保存设置</button>
+              </div>
+              <p id="settingsMsg" class="form-msg"></p>
+            </div>
+          </form>
+        </section>
+
+        <!-- 导入导出 -->
+        <section id="tab-io" class="tab-panel">
+          <div class="toolbar"><h2>导入 / 导出</h2></div>
+          <div class="io-grid">
+            <div class="card">
+              <div class="card-body">
+                <h3>导出</h3>
+                <p class="hint">导出全部站点、任务、流程、全局设置与日志为 JSON。</p>
+                <button id="btnExport" class="btn btn-primary">导出 JSON</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <h3>导入</h3>
+                <p class="hint">默认按 id 合并；勾选后替换全部站点、任务与流程。</p>
+                <label class="check"><input id="importReplace" type="checkbox" /> 替换现有数据（不合并）</label>
+                <div class="io-row">
+                  <input id="importFile" type="file" accept="application/json,.json" />
+                  <button id="btnImport" class="btn">导入</button>
+                </div>
+                <p id="ioMsg" class="form-msg"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI 探索生成 Dialog -->
+        <dialog id="dlgExplore">
+          <div class="dialog-head">
+            <h3>🤖 AI 探索生成任务</h3>
+          </div>
+          <div class="dialog-body">
+            <p class="hint">扩展将用大模型自动探索目标网站，观察页面并决策操作，归纳出可复用的自动化步骤，无需人工编写选择器。</p>
+            <div class="field">
+              <label>目标网址</label>
+              <input id="exploreUrl" placeholder="https://example.com/checkin" />
+            </div>
+            <div class="field">
+              <label>任务目标描述</label>
+              <input id="exploreGoal" placeholder="例如：点击签到按钮完成签到，然后看到成功提示" />
+            </div>
+            <div class="field">
+              <label>成功关键词（逗号分隔，可选）</label>
+              <input id="exploreSuccessKws" placeholder="例如：签到成功,已签到,积分+1" />
+            </div>
+            <div class="card">
+              <div class="card-head"><h4>探索日志</h4></div>
+              <div class="explore-log" id="exploreLog">等待开始…</div>
+            </div>
+          </div>
+          <div class="dialog-footer">
+            <button id="btnStartExplore" class="btn btn-primary">开始探索</button>
+            <button id="btnAbortExplore" class="btn btn-error btn-ghost hidden">停止探索</button>
+            <button id="btnCloseExplore" class="btn btn-ghost">关闭</button>
+          </div>
+        </dialog>
+
+        <!-- 录制生成 Dialog -->
+        <dialog id="dlgRecord">
+          <div class="dialog-head">
+            <h3>⏺ 录制生成任务</h3>
+          </div>
+          <div class="dialog-body">
+            <p class="hint">在打开的页面上像平时一样操作（点击、输入、跳转），扩展会实时把你的每一步翻译成可复用的自动化步骤。完成后点「停止并保存」即生成任务，零 token 成本、100% 准确。</p>
+            <div class="field">
+              <label>目标网址</label>
+              <input id="recordUrl" placeholder="https://example.com/checkin" />
+            </div>
+            <div class="field">
+              <label>任务名称</label>
+              <input id="recordName" placeholder="例如：某站每日签到" />
+            </div>
+            <div class="field">
+              <label>成功关键词（逗号分隔，可选）</label>
+              <input id="recordSuccessKws" placeholder="例如：签到成功,已签到" />
+            </div>
+            <div class="card">
+              <div class="card-head"><h4>已录制步骤 <span class="count" id="recordCount">0</span></h4></div>
+              <p id="recordHint" class="record-hint hidden"></p>
+              <div class="record-steps" id="recordSteps"><span class="hint">开始后，你的操作会在这里逐条出现…</span></div>
+            </div>
+          </div>
+          <div class="dialog-footer">
+            <button id="btnStartRecord" class="btn btn-primary">开始录制</button>
+            <button id="btnStopRecord" class="btn btn-success hidden">停止并保存</button>
+            <button id="btnCloseRecord" class="btn btn-ghost">关闭</button>
+          </div>
+        </dialog>
+
+        <!-- 执行介入面板（始终渲染，状态隐藏） -->
+        <div id="interventionPanel" class="hidden card" style="margin-top:1rem">
+          <header class="card-head">
+            <span class="card-num">⚠️</span>
+            <div>
+              <h4>需要介入 — 步骤执行失败</h4>
+              <p id="interventionDesc"></p>
+            </div>
+          </header>
+          <div class="card-body">
+            <div class="grid-2" style="margin-bottom:1rem">
+              <div class="field">
+                <label>步骤类型</label>
+                <span id="itvStepType"></span>
+              </div>
+              <div class="field">
+                <label>当前选择器</label>
+                <code id="itvStepSelector"></code>
+              </div>
+            </div>
+            <div class="intervention-actions">
+              <button id="btnItvRetry" class="btn">重试此步骤</button>
+              <button id="btnItvSkip" class="btn btn-ghost">跳过此步骤</button>
+              <button id="btnItvAbort" class="btn btn-error btn-ghost">终止执行</button>
+            </div>
+            <div class="field hidden" id="interventionPatchRow">
+              <label>✏️ 修改选择器后重试</label>
+              <div class="fix-row">
+                <input id="interventionPatchSelector" placeholder="新的 CSS / XPath 选择器" />
+                <button id="btnItvPatch" class="btn btn-sm">应用修复</button>
+              </div>
+              <p class="hint">修复后的选择器会通过 <code>patchHistory</code> 写回任务，下次执行自动使用新选择器。</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <template id="stepTpl">
+      <div class="step-item">
+        <div class="step-index"></div>
+        <div class="step-body">
+          <div class="step-row">
+            <label class="step-field step-field-type">
+              <span class="step-field-label">操作</span>
+              <select class="step-type">
+                <option value="click">点击元素</option>
+                <option value="waitForText">等待文字出现</option>
+                <option value="waitFor">等待元素出现</option>
+                <option value="wait">固定等待</option>
+                <option value="type">输入文本</option>
+                <option value="goto">跳转到网址</option>
+                <option value="waitForUrl">等待地址栏变化</option>
+                <option value="manual">暂停·人工操作</option>
+              </select>
+            </label>
+            <label class="step-field step-field-main">
+              <span class="step-field-label step-label-main">目标（CSS / XPath）</span>
+              <input class="step-selector" placeholder="例如 .checkin 或 //button[contains(.,'任务')]" />
+            </label>
+            <label class="step-field step-field-extra">
+              <span class="step-field-label step-label-extra">附加内容</span>
+              <input class="step-extra" placeholder="按操作类型填写" />
+            </label>
+            <label class="step-field step-field-timeout">
+              <span class="step-field-label">超时(ms)</span>
+              <input class="step-timeout" type="number" placeholder="15000" />
+            </label>
+          </div>
+          <div class="step-row step-row-sub">
+            <div class="step-flags">
+              <label class="check step-flag" title="点击后监视 OAuth 新标签">
+                <input type="checkbox" class="step-watch-popup" /> 监视弹窗
+              </label>
+              <label class="check step-flag" title="点击后等待整页跳转">
+                <input type="checkbox" class="step-wait-nav" /> 等页面跳转
+              </label>
+            </div>
+            <div class="step-ops">
+              <button type="button" class="btn btn-ghost btn-sm step-up" title="上移">↑</button>
+              <button type="button" class="btn btn-ghost btn-sm step-down" title="下移">↓</button>
+              <button type="button" class="btn btn-error btn-ghost btn-sm step-del">删除</button>
+            </div>
+          </div>
+          <p class="step-desc"></p>
+        </div>
+      </div>
+    </template>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/*
+ * 只用自定义主题，内置主题全部关掉（themes: false）。
+ * 注意：`themes: xxx --default/--prefersdark` 那套 flag 只对 daisyUI 内置主题生效；
+ * 自定义主题必须把 default / prefersdark 写在各自的 @plugin "daisyui/theme" 块里，
+ * 否则深色模式的 @media (prefers-color-scheme: dark) 根本不会产出。
+ */
+@plugin "daisyui" {
+  themes: false;
+  include: button, card, badge, tab, input, select, textarea, table,
+           modal, menu, alert, stat, divider, loading, checkbox, toggle, join;
+}
+
+@plugin "daisyui/theme" {
+  name: "autopage";
+  default: true;
+  color-scheme: light;
+  --color-primary: oklch(0.57 0.2 250);
+  --color-primary-content: oklch(1 0 0);
+  --color-secondary: oklch(0.65 0.15 260);
+  --color-accent: oklch(0.75 0.18 160);
+  --color-base-100: oklch(1 0 0);
+  --color-base-200: oklch(0.97 0 0);
+  --color-base-300: oklch(0.92 0 0);
+  --color-base-content: oklch(0.2 0 0);
+  /* daisyUI 的 .tab-active 阴影、select option 高亮都引用 neutral；
+     不定义会让整条 box-shadow 在计算值阶段失效。 */
+  --color-neutral: oklch(0.28 0.01 250);
+  --color-neutral-content: oklch(0.98 0 0);
+  --color-info: oklch(0.65 0.15 220);
+  --color-info-content: oklch(1 0 0);
+  --color-success: oklch(0.65 0.18 150);
+  --color-success-content: oklch(1 0 0);
+  --color-warning: oklch(0.75 0.15 70);
+  --color-warning-content: oklch(0.24 0.04 70);
+  --color-error: oklch(0.62 0.22 25);
+  --color-error-content: oklch(1 0 0);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --radius-btn: 0.625rem;
+  --radius-badge: 999px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+  --font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+@plugin "daisyui/theme" {
+  name: "autopage-dark";
+  prefersdark: true;
+  color-scheme: dark;
+  --color-primary: oklch(0.65 0.2 250);
+  --color-primary-content: oklch(1 0 0);
+  --color-secondary: oklch(0.7 0.15 260);
+  --color-accent: oklch(0.8 0.18 160);
+  --color-base-100: oklch(0.22 0 0);
+  --color-base-200: oklch(0.18 0 0);
+  --color-base-300: oklch(0.15 0 0);
+  --color-base-content: oklch(0.9 0 0);
+  --color-neutral: oklch(0.32 0.01 250);
+  --color-neutral-content: oklch(0.96 0 0);
+  --color-info: oklch(0.7 0.15 220);
+  --color-info-content: oklch(0.16 0.03 220);
+  --color-success: oklch(0.7 0.18 150);
+  --color-success-content: oklch(0.16 0.04 150);
+  --color-warning: oklch(0.8 0.15 70);
+  --color-warning-content: oklch(0.2 0.04 70);
+  --color-error: oklch(0.68 0.22 25);
+  --color-error-content: oklch(0.16 0.04 25);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --radius-btn: 0.625rem;
+  --radius-badge: 999px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+  --font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/*
+ * 字体渲染：消除锯齿/像素感。
+ * -webkit-font-smoothing: antialiased 在 Chrome/Edge/Safari 上启用灰度抗锯齿
+ * （Chrome 默认 subpixel-antialiased 在非 Retina 屏上 CJK 笔画会显得发虚/发粗）；
+ * -moz-osx-font-smoothing: grayscale 对应 Firefox macOS。
+ * text-rendering: optimizeLegibility 开启连字与字距优化。
+ */
+@layer base {
+  html {
+    /* daisyUI 5 会把 theme 块的 --font-family 压缩为 generic-name fallback（sans-serif），
+       不保留自定义字体栈，所以直接在 html 上显式设置。 */
+    font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}

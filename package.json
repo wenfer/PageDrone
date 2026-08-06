@@ -1,0 +1,39 @@
+{
+  "name": "auto-page",
+  "version": "1.2.0",
+  "private": true,
+  "description": "网页版 RPA 工具 - 画布编排任务与流程",
+  "type": "module",
+  "scripts": {
+    "postinstall": "wxt prepare",
+    "typecheck": "wxt prepare && tsc -p . --noEmit",
+    "build": "npm run typecheck && wxt build",
+    "dev": "wxt",
+    "zip": "npm run typecheck && wxt zip",
+    "pack": "bash scripts/pack.sh"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chrome": "^0.0.270",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@wxt-dev/module-react": "^1.2.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.6.0",
+    "wxt": "^0.21.3"
+  },
+  "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@xyflow/react": "^12.11.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.4.0"
+  }
+}
