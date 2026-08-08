@@ -1,5 +1,8 @@
 {
   "spec": "auto-checkin-procedure/1",
+  "marketId": "example-discuz-checkin",
+  "version": "1.0.0",
+  "updatedAt": "2026-08-07T00:00:00Z",
   "procedure": {
     "kind": "checkin",
     "name": "Discuz! 论坛执行",

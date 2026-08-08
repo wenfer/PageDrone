@@ -208,8 +208,8 @@ function selectSite(id) {
 }
 
 function onNewSite() {
-  // 自动创建一个默认自动化任务并绑定
-  const proc = createProcedure({ kind: 'checkin', name: '新自动化任务' });
+  // 自动创建一个默认自动化技能并绑定
+  const proc = createProcedure({ kind: 'checkin', name: '新自动化技能' });
   procedures.push(proc);
   const site = createSite({ name: '新站点', checkinProcedureId: proc.id });
   currentSiteId = site.id;
@@ -220,7 +220,7 @@ function onNewSite() {
   renderProcKindOptions();
   $('#editorEmpty').classList.add('hidden');
   $('#siteForm').classList.remove('hidden');
-  setFormMsg('请填写后点击保存（已自动创建默认自动化任务）', '');
+  setFormMsg('请填写后点击保存（已自动创建默认自动化技能）', '');
 }
 
 function fillSiteForm(site) {
@@ -274,15 +274,15 @@ function renderProcKindOptions() {
   const logins = procedures.filter((p) => p.kind === 'login');
   checkinSel.innerHTML = checkins.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}${p.source === 'market' ? '  ⬇' : ''}</option>`).join('') || '<option value="">（请先到任务库新建）</option>';
   if (curC && checkins.some((p) => p.id === curC)) checkinSel.value = curC;
-  loginSel.innerHTML = '<option value="">（不使用登录任务）</option>' + logins.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}${p.source === 'market' ? '  ⬇' : ''}</option>`).join('');
+  loginSel.innerHTML = '<option value="">（不使用登录技能）</option>' + logins.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}${p.source === 'market' ? '  ⬇' : ''}</option>`).join('');
   if (curL && logins.some((p) => p.id === curL)) loginSel.value = curL;
 }
 
 function renderProcPreviews(site) {
   const cp = procedures.find((p) => p.id === site.checkinProcedureId);
   const lp = procedures.find((p) => p.id === site.loginProcedureId);
-  $('#checkinProcPreview').innerHTML = cp ? procPreviewHtml(cp) : '<span class="hint">未选择自动化任务</span>';
-  $('#loginProcPreview').innerHTML = lp ? procPreviewHtml(lp) : '<span class="hint">不需要登录任务可留空</span>';
+  $('#checkinProcPreview').innerHTML = cp ? procPreviewHtml(cp) : '<span class="hint">未选择自动化技能</span>';
+  $('#loginProcPreview').innerHTML = lp ? procPreviewHtml(lp) : '<span class="hint">不需要登录技能可留空</span>';
 }
 
 function procPreviewHtml(p) {
@@ -336,7 +336,7 @@ async function onSaveSite(e) {
     const site = collectSiteFromForm();
     if (!site.name) throw new Error('请填写名称');
     if (!/^https?:\/\//i.test(site.url)) throw new Error('请填写有效的 http(s) URL');
-    if (!site.checkinProcedureId) throw new Error('请选择自动化任务');
+    if (!site.checkinProcedureId) throw new Error('请选择自动化技能');
     // 保存任务（可能在任务编辑器里改了但没存——这里不自动存，任务库自己有保存按钮）
     await upsertSite(site);
     try { await chrome.runtime.sendMessage({ type: MSG.RESCHEDULE }); } catch {}
@@ -420,7 +420,7 @@ function bindSiteEditor() {
 }
 
 async function createAndSelectProc(kind) {
-  const proc = createProcedure({ kind, name: kind === 'login' ? '新登录任务' : '新自动化任务' });
+  const proc = createProcedure({ kind, name: kind === 'login' ? '新登录技能' : '新自动化技能' });
   await upsertProcedure(proc);
   await reloadAll();
   switchTab('procedures');
@@ -556,7 +556,7 @@ function renderProcDetectFields(proc) {
         </div>
         <div class="field">
           <label>未登录关键词（逗号分隔）</label>
-          <input name="notLoggedInKeywords" value="${escapeHtml((d.notLoggedInKeywords || []).join(','))}" placeholder="请登录,登录后操作" />
+          <input name="notLoggedInKeywords" value="${escapeHtml((d.notLoggedInKeywords || []).join(','))}" placeholder="例如：会话已过期,登录后操作" />
         </div>
       </div>
       <p class="hint">执行中若地址命中「登录页 URL 模式」或页面出现「未登录关键词」，扩展会自动中断执行、执行下面的登录步骤，然后重试执行一次。</p>

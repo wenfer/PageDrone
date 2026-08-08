@@ -9,7 +9,6 @@ import type {
   Step,
   RunStatus,
   SiteRunResult,
-  ExtractMode,
 } from './models.js';
 
 /** 运行时状态（setRuntime 增量合并；含探索/录制/介入等临时字段） */
@@ -29,7 +28,15 @@ export interface RuntimeState {
   // 介入
   interventionCtx?: InterventionContext;
   // AI 对话
-  agentProgress?: { sessionId: string; runId: string; turn?: number; message: string; at: number } | null;
+  agentProgress?: {
+    sessionId: string;
+    runId: string;
+    turn?: number;
+    message: string;
+    at: number;
+    thinkingEnabled?: boolean;
+    thinking?: AgentThinkingStep[];
+  } | null;
   agentResult?: { sessionId: string; runId: string; ok: boolean; halt: string; message: string } | null;
   [key: string]: unknown;
 }
@@ -97,6 +104,18 @@ export interface ExploreProgress {
 
 // —— AI 对话 ——
 
+/** AI 对话的可公开思考摘要；不是模型内部的隐藏推理原文。 */
+export interface AgentThinkingStep {
+  id: string;
+  turn: number;
+  stage: 'thinking' | 'decision' | 'repair' | 'result';
+  title: string;
+  detail?: string;
+  skill?: string;
+  ok?: boolean;
+  at: number;
+}
+
 /** 一次 AI 工具调用在对话流里的可核验结果。 */
 export interface SkillTrace {
   skill: string;
@@ -113,6 +132,7 @@ export interface ChatTurn {
   at: number;
   status?: 'success' | 'question' | 'error';
   traces?: SkillTrace[];
+  thinking?: AgentThinkingStep[];
   touched?: { kind: 'procedure' | 'site' | 'flow'; id: string; name: string }[];
 }
 
@@ -147,6 +167,9 @@ export interface ExecutionResult {
   message: string;
   loginRedirect?: boolean;
   needKeywordCheck: boolean;
+  /** 失败发生时对应的步骤位置，供诊断工具和 AI 修复使用。 */
+  failedStepIndex?: number;
+  failedStepType?: string;
   cfWaitedMs?: number;
   /** 技能内 extract/script 步骤产生的命名结果。 */
   outputs?: Record<string, unknown>;
@@ -176,15 +199,71 @@ export interface RunProcedureOptions {
   keepTab?: boolean;
   active?: boolean;
   watchDeviation?: boolean;
+  /** 以诊断模式运行：每个步骤前后采样页面并把观察结果返回。 */
+  diagnostic?: boolean;
+  /** 执行归属于网站的自动化技能时，同时按站点配置执行登录技能。 */
+  withSiteLogin?: boolean;
+  /** 流程节点关联的可取消执行实例。 */
+  executionId?: string;
 }
 
-export interface ExtractPageDataOptions {
-  /** 未提供时由后台使用当前活动标签页；流程节点应传入技能运行返回的 tabId。 */
-  tabId?: number;
-  selector: string;
-  mode?: ExtractMode;
-  attribute?: string;
-  multiple?: boolean;
+/** 技能诊断期间从目标页采样到的事实快照；不包含模型推测。 */
+export interface PageObservation {
+  at: number;
+  phase: 'initial' | 'before' | 'after' | 'error';
+  stepIndex: number;
+  stepType: string;
+  tabId: number;
+  url: string;
+  title: string;
+  text: string;
+  elements: Array<{ tag: string; type: string; text: string; selector: string }>;
+  changed: boolean;
+  changes: string[];
+}
+
+/** 流程诊断结果；流程本身仍由 React Flow 画布执行。 */
+export interface FlowTestReport {
+  requestId?: string;
+  flowId: string;
+  ok: boolean;
+  status: 'success' | 'failed' | 'aborted';
+  message: string;
+  logs: Array<{ id: string; level: string; message: string; at: number }>;
+  variables: Record<string, unknown>;
+  nodeReports: FlowNodeReport[];
+  summary?: {
+    success: number;
+    failed: number;
+    timeout: number;
+    needLogin: number;
+    skipped: number;
+    aborted: number;
+  };
+  startedAt?: number;
+  finishedAt?: number;
+}
+
+export type FlowNodeStatus = 'success' | 'failed' | 'timeout' | 'need_login' | 'skipped' | 'aborted';
+export type FlowErrorType = 'http_500' | 'network' | 'need_login' | 'selector' | 'timeout' | 'aborted' | 'validation' | 'unknown';
+
+export interface FlowNodeReport {
+  nodeId: string;
+  nodeName: string;
+  nodeType: string;
+  siteId?: string;
+  siteName?: string;
+  procedureId?: string;
+  status: FlowNodeStatus;
+  errorType?: FlowErrorType;
+  message: string;
+  startedAt: number;
+  finishedAt: number;
+  durationMs: number;
+  attempts: number;
+  failedStepIndex?: number;
+  failedStepType?: string;
+  repairHint?: string;
 }
 
 export interface HttpRequestOptions {
@@ -207,6 +286,9 @@ export interface RunOutcome {
   tabId?: number | null;
   outputs?: Record<string, unknown>;
   returnValue?: unknown;
+  observations?: PageObservation[];
+  failedStepIndex?: number;
+  failedStepType?: string;
 }
 
 export interface KeywordJudgement {
@@ -227,12 +309,22 @@ export interface MessageRequestMap {
   [MSG.PROCEDURE_SAVE]: { procedure: Procedure };
   [MSG.PROCEDURE_DELETE]: { id: string };
   [MSG.RUN_PROCEDURE]: { procedureId: string } & RunProcedureOptions;
+  [MSG.RUN_PROCEDURE_ABORT]: { executionId: string };
   [MSG.MARKET_INDEX]: Record<string, never>;
-  [MSG.MARKET_INSTALL]: { marketId: string; siteId: string };
+  [MSG.MARKET_INSTALL]: {
+    marketId: string;
+    siteId: string;
+    /** 新版市场索引提供的相对技能包路径；缺省时兼容旧约定路径。 */
+    download?: string;
+    /** 目录条目声明的版本，后台会与下载包版本严格校验。 */
+    version?: string;
+  };
   [MSG.FLOW_LIST]: Record<string, never>;
   [MSG.FLOW_SAVE]: { flow: Flow };
   [MSG.FLOW_DELETE]: { id: string };
-  [MSG.EXTRACT_PAGE_DATA]: ExtractPageDataOptions;
+  /** 画布诊断完成后回传给 Service Worker，供 AI 对话等待结果。 */
+  [MSG.FLOW_TEST_RESULT]: { requestId: string; report: FlowTestReport };
+  [MSG.FLOW_TEST_PROGRESS]: { requestId: string; message: string };
   [MSG.HTTP_REQUEST]: HttpRequestOptions;
   [MSG.EXPLORE_GENERATE]: { siteId: string; url: string; goal: string; successKws?: string[] };
   [MSG.EXPLORE_ABORT]: Record<string, never>;

@@ -1,5 +1,8 @@
 {
   "spec": "auto-checkin-procedure/1",
+  "marketId": "example/generic-login",
+  "version": "1.0.0",
+  "updatedAt": "2026-08-07T00:00:00Z",
   "procedure": {
     "kind": "login",
     "name": "通用账号密码登录",
@@ -11,7 +14,7 @@
       "notLoggedInKeywords": ["请登录", "登录后操作", "您需要登录"]
     },
     "steps": [
-      { "type": "goto", "selector": "https://example.com/login", "timeoutMs": 30000 },
+      { "type": "goto", "url": "https://example.com/login", "timeoutMs": 30000 },
       { "type": "waitFor", "selector": "input[name=username]", "timeoutMs": 15000 },
       { "type": "type", "selector": "input[name=username]", "text": "你的账号", "timeoutMs": 10000 },
       { "type": "type", "selector": "input[name=password]", "text": "你的密码", "timeoutMs": 10000 },

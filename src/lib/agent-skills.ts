@@ -6,7 +6,7 @@
  *     自动生成（renderSkillCatalog），不存在第二份需要同步的副本。
  *  2. 执行前强制校验（validateSkillCall / validateStep），校验失败时把
  *     「正确签名」回灌给模型让它自己改——比让它凭空猜有效得多。
- *  3. 只读 AI 工具（list-procedures / get-procedure / read-page）先于写入工具提供，
+ *  3. 只读 AI 工具（含测试报告、流程和页面观察）先于写入工具提供，
  *     让模型先看清现状再动手。
  *  4. 所有接收 id 的 AI 工具都校验 id 真实存在，并在报错里列出当前可用 id，
  *     从根上掐掉「模型编一个 proc_xxx」这类幻觉。
@@ -19,17 +19,22 @@ import {
   createSite,
   type Procedure,
   type Site,
+  type Flow,
   type Step,
   type StepType,
 } from './models.js';
-import { createFlow, saveFlow } from './flows.js';
+import { createFlow, getFlows, saveFlow } from './flows.js';
 import {
   getProcedure,
+  getLogs,
   getProcedures,
   getSites,
+  updateSiteLastResult,
   upsertProcedure,
   upsertSite,
 } from './storage.js';
+import { runFlowTest } from './flow-test.js';
+import type { PageObservation } from './types.js';
 
 // —— AI 工具声明 ——
 
@@ -91,14 +96,49 @@ export const SKILLS: readonly SkillDef[] = [
     args: {
       procedureId: { type: 'string', required: true, desc: '技能 id' },
     },
-    returns: '{ procedure: { id, name, kind, siteId, url, detect, steps: [...] } }',
+    returns: '{ procedure: { id, name, kind, siteId, url, description, script, detect, steps: [...], output, lastResult } }',
+  },
+  {
+    name: 'get-site',
+    group: 'read',
+    summary: '读取单个站点的完整配置和最近执行结果，用于诊断技能为什么没有按预期执行。不会返回 AI API Key 等敏感设置。',
+    args: {
+      siteId: { type: 'string', required: true, desc: '站点 id' },
+    },
+    returns: '{ site: { id, name, url, enabled, mode, skill bindings, schedule, timeouts, lastResult } }',
+  },
+  {
+    name: 'list-logs',
+    group: 'read',
+    summary: '查看最近的本地执行日志，可按站点筛选。修复技能前先用它确认实际失败步骤和错误信息。',
+    args: {
+      siteId: { type: 'string', desc: '可选：只查看该站点的日志' },
+      limit: { type: 'number', desc: '返回条数，默认 20，最多 50' },
+    },
+    returns: '{ logs: [{ id, siteId, siteName, status, message, startedAt, finishedAt, cfWaitedMs }] }',
+  },
+  {
+    name: 'list-flows',
+    group: 'read',
+    summary: '列出流程及其节点引用；测试或修复流程前先拿到真实 flowId。',
+    args: {},
+    returns: '{ flows: [{ id, name, nodeCount, procedureIds }] }',
+  },
+  {
+    name: 'get-flow',
+    group: 'read',
+    summary: '读取流程完整节点、连线和变量；测试流程发现节点问题后必须先读取它。',
+    args: {
+      flowId: { type: 'string', required: true, desc: '流程 id' },
+    },
+    returns: '{ flow: { id, name, description, nodes: [...], edges: [...], variables } }',
   },
 
   // —— 写入 ——
   {
     name: 'create-procedure',
     group: 'write',
-    summary: '创建一个新的可编排技能。创建后会返回它的 id，后续用 add-step 往里加步骤。',
+    summary: '创建一个新的可编排技能。创建后会返回它的 id，后续用 add-step 往里加步骤；login 登录技能只使用标准点击/等待动作，不添加 manual 人工步骤。',
     args: {
       name: { type: 'string', required: true, desc: '技能名称，简短可辨识' },
       siteId: { type: 'string', required: true, desc: '所属网站 id；必须先通过 list-sites 获取真实 id' },
@@ -122,7 +162,7 @@ export const SKILLS: readonly SkillDef[] = [
   {
     name: 'add-step',
     group: 'write',
-    summary: '往可编排技能末尾追加一个执行步骤。',
+    summary: '往可编排技能末尾追加一个执行步骤。login 登录技能禁止添加 manual；执行器会自动提交 Chrome 自动填充的普通表单。',
     args: {
       procedureId: { type: 'string', required: true, desc: '技能 id' },
       step: {
@@ -157,6 +197,30 @@ export const SKILLS: readonly SkillDef[] = [
       stepIndex: { type: 'number', required: true, desc: '步骤下标，从 0 开始' },
     },
     returns: '{ procedureId, stepCount }',
+  },
+  {
+    name: 'replace-steps',
+    group: 'write',
+    summary: '整体替换一个技能的标准操作序列。适合根据 get-procedure 和 list-logs 的诊断结果一次性重排修复步骤；会覆盖原步骤，执行前必须得到用户明确指令。',
+    args: {
+      procedureId: { type: 'string', required: true, desc: '技能 id' },
+      steps: { type: 'object', required: true, desc: '步骤数组；每个步骤字段要求同 add-step' },
+    },
+    returns: '{ procedureId, stepCount, steps }',
+  },
+  {
+    name: 'update-procedure',
+    group: 'write',
+    summary: '修改已有技能的名称、说明、目标网址或自定义脚本。不会改变技能所属网站、类型、来源或本地历史；清空脚本请使用 clearScript=true。',
+    args: {
+      procedureId: { type: 'string', required: true, desc: '技能 id' },
+      name: { type: 'string', desc: '技能名称' },
+      description: { type: 'string', desc: '技能说明' },
+      url: { type: 'string', desc: '目标网址（http/https 开头）' },
+      script: { type: 'string', desc: '自定义脚本；技能存在标准步骤时通常不会执行脚本' },
+      clearScript: { type: 'boolean', desc: '是否清空现有自定义脚本' },
+    },
+    returns: '{ procedureId, name, description, url, scriptLength, stepCount }',
   },
   {
     name: 'set-detect',
@@ -223,13 +287,29 @@ export const SKILLS: readonly SkillDef[] = [
   {
     name: 'create-flow',
     group: 'write',
-    summary: '创建流程（画布节点图）。给出 procedureIds 时按顺序串成一条链。',
+    summary: '创建流程（画布节点图）。可按 procedureIds 串行编排，也可选择当前所有站点并保存同步策略。登录技能默认排除。',
     args: {
       name: { type: 'string', required: true, desc: '流程名称' },
       description: { type: 'string', desc: '流程说明' },
       procedureIds: { type: 'string[]', desc: '要串行执行的技能 id，按先后顺序' },
+      siteScope: { type: 'string', enum: ['explicit', 'all-sites'], desc: 'explicit 使用 procedureIds；all-sites 使用当前站点集合' },
+      includeDisabled: { type: 'boolean', desc: 'all-sites 时是否包含禁用站点，默认 false' },
+      includeMissingSiteId: { type: 'boolean', desc: '是否包含没有 siteId 的旧技能，默认 false（无法安全归属时会跳过）' },
+      includeLoginProcedures: { type: 'boolean', desc: '是否包含登录技能，默认 false' },
+      autoSyncSites: { type: 'boolean', desc: '执行前自动把新增站点追加到流程，默认 false' },
     },
     returns: '{ flowId, name, nodeCount }',
+  },
+  {
+    name: 'update-flow-node',
+    group: 'write',
+    summary: '定点修改流程中一个节点的配置，保留其他节点、连线和变量；修改后必须重新测试流程。',
+    args: {
+      flowId: { type: 'string', required: true, desc: '流程 id' },
+      nodeId: { type: 'string', required: true, desc: '节点 id，必须来自 get-flow' },
+      data: { type: 'object', required: true, desc: '要合并到节点 data 的字段，例如 selector、url、procedureId' },
+    },
+    returns: '{ flowId, nodeId, nodeType, data }',
   },
 
   // —— 浏览器 ——
@@ -243,6 +323,31 @@ export const SKILLS: readonly SkillDef[] = [
       url: { type: 'string', required: true, desc: '要查看的网址（http/https 开头）' },
     },
     returns: '{ url, title, text, elements: [{ tag, text, selector }] }',
+    costly: true,
+  },
+  {
+    name: 'test-procedure',
+    group: 'browser',
+    summary:
+      '在隔离标签页真实执行一个技能，并在每个步骤前后采样 URL、标题、页面正文和可交互元素。' +
+      '返回的是页面事实和失败步骤；不会修改技能或日志，若确认登录失效只在站点上标记“需要登录”。如果用户要求修复，读取报告后再调用写入工具并重新测试。',
+    args: {
+      procedureId: { type: 'string', required: true, desc: '要测试的技能 id' },
+      url: { type: 'string', desc: '可选：本次测试使用的目标网址；留空按技能/所属网站推导' },
+    },
+    returns: '{ testOk, status, message, siteId, siteName, loginRequired, loginHint, loginSignals, failedStepIndex, failedStepType, observations: [...] }',
+    costly: true,
+  },
+  {
+    name: 'test-flow',
+    group: 'browser',
+    summary:
+      '打开隔离的 React Flow 画布，使用正式流程执行引擎真实运行流程并回传节点日志、变量和技能页面观察。' +
+      '不会自动改流程；发现问题后先读取真实配置，再根据用户意图修改并重测。',
+    args: {
+      flowId: { type: 'string', required: true, desc: '要测试的流程 id' },
+    },
+    returns: '{ testOk, status, message, logs: [...], nodeReports: [{siteName,nodeName,procedureId,status,durationMs,errorType,failedStepIndex,repairHint}], summary, variables: {...} }',
     costly: true,
   },
   {
@@ -394,6 +499,7 @@ export function validateStep(raw: unknown): ValidationResult {
 export interface SkillContext {
   procedures: Procedure[];
   sites: Site[];
+  flows: Flow[];
   settings: import('./models.js').Settings;
   signal: import('./cancellation.js').CancellationToken;
   onProgress?: (message: string) => void;
@@ -442,6 +548,7 @@ export function validateSkillCall(
     const compatible =
       actual === def.type ||
       (def.type === 'string[]' && actual === 'string') ||
+      (name === 'replace-steps' && argName === 'steps' && Array.isArray(v)) ||
       (def.type === 'number' && actual === 'string' && !Number.isNaN(Number(v)));
     if (!compatible) {
       return {
@@ -499,12 +606,46 @@ export function validateSkillCall(
       }
     }
   }
+  if (typeof args.flowId === 'string' && args.flowId.trim()) {
+    const flow = ctx.flows.find((item) => item.id === args.flowId);
+    if (!flow) {
+      const avail = ctx.flows.length
+        ? ctx.flows.map((flow) => `${flow.id}（${flow.name}）`).join('、')
+        : '（当前没有任何流程，请先创建流程）';
+      return { ok: false, error: `flowId "${args.flowId}" 不存在。当前可用流程：${avail}` };
+    }
+    if (name === 'update-flow-node') {
+      const nodeId = String(args.nodeId || '').trim();
+      if (!flow.nodes.some((node) => node.id === nodeId)) {
+        return { ok: false, error: `nodeId "${nodeId}" 不存在于流程「${flow.name}」，请先用 get-flow 查看真实节点 id` };
+      }
+    }
+  }
 
   if (name === 'add-step' || name === 'update-step') {
     const r = validateStep(args.step);
     if (!r.ok) return r;
+    const procedure = typeof args.procedureId === 'string'
+      ? ctx.procedures.find((item) => item.id === args.procedureId)
+      : undefined;
+    if (procedure?.kind === 'login' && (args.step as Record<string, unknown>)?.type === 'manual') {
+      return { ok: false, error: '登录技能不能添加 manual 人工步骤。请使用真实登录入口的 click/goto/wait/waitFor/waitForUrl 标准动作；执行器会自动提交 Chrome 自动填充的账号密码。' };
+    }
   }
-  if ((name === 'read-page' || name === 'explore-page' || name === 'create-site') &&
+  if (name === 'replace-steps') {
+    if (!Array.isArray(args.steps)) return { ok: false, error: 'replace-steps 的 steps 必须是数组' };
+    const procedure = typeof args.procedureId === 'string'
+      ? ctx.procedures.find((item) => item.id === args.procedureId)
+      : undefined;
+    for (const [index, step] of args.steps.entries()) {
+      const r = validateStep(step);
+      if (!r.ok) return { ok: false, error: `steps[${index}] 无效：${r.error}` };
+      if (procedure?.kind === 'login' && (step as Record<string, unknown>)?.type === 'manual') {
+        return { ok: false, error: `steps[${index}]：登录技能不能添加 manual 人工步骤，请改用标准点击/等待动作。` };
+      }
+    }
+  }
+  if ((name === 'read-page' || name === 'test-procedure' || name === 'explore-page' || name === 'create-site' || name === 'update-procedure') &&
       typeof args.url === 'string' && !/^https?:\/\//i.test(args.url)) {
     return { ok: false, error: `url 必须是 http:// 或 https:// 开头的完整网址，收到 "${args.url}"` };
   }
@@ -539,6 +680,78 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function summarizeObservation(observation: PageObservation): string {
+  const change = observation.changes.length ? `；${observation.changes.join('、')}` : '';
+  const text = String(redactAgentValue(observation.text)).replace(/\s+/g, ' ').trim().slice(0, 260);
+  const elements = observation.elements
+    .slice(0, 8)
+    .map((element) => {
+      const elementText = String(redactAgentValue(element.text));
+      return `${element.tag}${elementText ? `「${elementText}」` : ''}`;
+    })
+    .join('、');
+  return `页面观察：${observation.phase} · 步骤 ${observation.stepIndex >= 0 ? observation.stepIndex + 1 : '打开'} · ${observation.url}${change}${text ? `；正文：${text}` : ''}${elements ? `；交互：${elements}` : ''}`;
+}
+
+function redactPageElements<T extends { type?: string; text?: string }>(elements: T[]): Array<T & { text: string }> {
+  return elements.map((element) => ({
+    ...element,
+    text: element.type?.toLowerCase() === 'password'
+      ? '[密码字段]'
+      : String(redactAgentValue(element.text || '')),
+  }));
+}
+
+const AGENT_SENSITIVE_KEY = /(?:api[-_ ]?key|authorization|cookie|password|passwd|secret|token|credential|headers?)/i;
+const AGENT_TOKEN = /\b(?:Bearer\s+)?(?:sk-[A-Za-z0-9_-]{8,}|[A-Za-z0-9_-]{32,})\b/g;
+
+/**
+ * 清理回灌给模型和持久化到 AI 会话的值。headers 作为整体隐藏，避免字符串形式的
+ * Authorization/API Key 绕过字段名检测；普通长 token 仍由 AGENT_TOKEN 兜底遮盖。
+ */
+export function redactAgentValue(value: unknown, key = '', seen = new WeakSet<object>()): unknown {
+  if (AGENT_SENSITIVE_KEY.test(key)) return '[已隐藏]';
+  if (typeof value === 'string') return value.replace(AGENT_TOKEN, '[已隐藏]');
+  if (!value || typeof value !== 'object') return value;
+  if (seen.has(value)) return '[循环引用]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => redactAgentValue(item, '', seen));
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
+    entryKey,
+    redactAgentValue(entryValue, entryKey, seen),
+  ]));
+}
+
+function compactObservations(observations: PageObservation[]): Array<Record<string, unknown>> {
+  return observations.slice(-24).map((observation) => ({
+    at: observation.at,
+    phase: observation.phase,
+    stepIndex: observation.stepIndex,
+    stepType: observation.stepType,
+    url: observation.url,
+    title: observation.title,
+    changed: observation.changed,
+    changes: observation.changes,
+    text: String(redactAgentValue(observation.text)).slice(0, 900),
+    elements: redactAgentValue(observation.elements.slice(0, 20)),
+  }));
+}
+
+/** 从页面快照提取登录表单的非敏感事实，帮助 Agent 区分普通表单与弹窗授权。 */
+function inferLoginPageSignals(observations: PageObservation[]): Record<string, boolean> {
+  const elements = observations.flatMap((observation) => observation.elements || []);
+  const hasPasswordField = elements.some((element) => element.type?.toLowerCase() === 'password');
+  const hasLoginButton = elements.some((element) => {
+    const text = `${element.text || ''} ${element.type || ''}`;
+    return /登录|登錄|sign\s*in|log\s*in|submit/i.test(text);
+  });
+  return {
+    hasPasswordField,
+    hasLoginButton,
+    ordinaryFormLikely: hasPasswordField && hasLoginButton,
+  };
+}
+
 /** 供 prompt 使用的紧凑技能摘要 */
 export function summarizeProcedure(p: Procedure): Record<string, unknown> {
   return { id: p.id, name: p.name, kind: p.kind, siteId: p.siteId || '', stepCount: p.steps.length, url: p.url || '', hasOutput: p.output?.enabled === true };
@@ -554,6 +767,19 @@ export function summarizeSite(s: Site, skillCount?: number): Record<string, unkn
     checkinProcedureId: s.checkinProcedureId,
     loginProcedureId: s.loginProcedureId,
     verificationProcedureId: s.verificationProcedureId,
+  };
+}
+
+export function summarizeFlow(flow: Flow): Record<string, unknown> {
+  return {
+    id: flow.id,
+    name: flow.name,
+    description: flow.description,
+    nodeCount: flow.nodes.length,
+    edgeCount: flow.edges.length,
+    procedureIds: flow.nodes
+      .filter((node) => node.type === 'procedure' && typeof node.data?.procedureId === 'string')
+      .map((node) => String(node.data?.procedureId)),
   };
 }
 
@@ -587,8 +813,19 @@ export async function executeSkill(
 
   switch (name) {
     case 'list-procedures': {
-      const list = await getProcedures();
-      return { ok: true, data: { procedures: list.map(summarizeProcedure) } };
+      const [list, sites] = await Promise.all([getProcedures(), getSites()]);
+      const siteNames = new Map(sites.map((site) => [site.id, site.name]));
+      return {
+        ok: true,
+        data: {
+          procedures: list.map((procedure) => ({
+            ...summarizeProcedure(procedure),
+            siteName: siteNames.get(procedure.siteId) || '',
+            source: procedure.source,
+            version: procedure.version,
+          })),
+        },
+      };
     }
 
     case 'list-sites': {
@@ -600,6 +837,7 @@ export async function executeSkill(
     case 'get-procedure': {
       const proc = await getProcedure(String(args.procedureId));
       if (!proc) return { ok: false, error: `技能 ${String(args.procedureId)} 已不存在` };
+      const site = (await getSites()).find((item) => item.id === proc.siteId);
       return {
         ok: true,
         data: {
@@ -608,13 +846,79 @@ export async function executeSkill(
             name: proc.name,
             kind: proc.kind,
             siteId: proc.siteId || '',
+            siteName: site?.name || '',
             url: proc.url || '',
+            description: proc.description,
+            script: proc.script,
+            version: proc.version,
+            source: proc.source,
+            marketId: proc.marketId || '',
             detect: proc.detect,
             steps: proc.steps,
             output: proc.output || { enabled: false, fields: [] },
+            lastResult: proc.lastResult,
           },
         },
       };
+    }
+
+    case 'get-site': {
+      const site = (await getSites()).find((item) => item.id === String(args.siteId));
+      if (!site) return { ok: false, error: `站点 ${String(args.siteId)} 已不存在` };
+      return {
+        ok: true,
+        data: {
+          site: {
+            id: site.id,
+            name: site.name,
+            url: site.url,
+            enabled: site.enabled,
+            mode: site.mode,
+            checkinProcedureId: site.checkinProcedureId,
+            loginProcedureId: site.loginProcedureId,
+            verificationProcedureId: site.verificationProcedureId,
+            cfTimeoutMs: site.cfTimeoutMs,
+            pageLoadTimeoutMs: site.pageLoadTimeoutMs,
+            stepsTimeoutMs: site.stepsTimeoutMs,
+            keepTabOnError: site.keepTabOnError,
+            openInBackground: site.openInBackground,
+            schedule: site.schedule,
+            lastResult: site.lastResult,
+          },
+        },
+      };
+    }
+
+    case 'list-logs': {
+      const siteId = typeof args.siteId === 'string' ? args.siteId.trim() : '';
+      const limit = Math.min(50, Math.max(1, Math.floor(num(args.limit, 20))));
+      const logs = (await getLogs())
+        .filter((log) => !siteId || log.siteId === siteId)
+        .slice(0, limit)
+        .map((log) => ({
+          id: log.id,
+          taskId: log.taskId,
+          siteId: log.siteId,
+          siteName: log.siteName,
+          status: log.status,
+          message: log.message,
+          startedAt: log.startedAt,
+          finishedAt: log.finishedAt,
+          cfWaitedMs: log.cfWaitedMs,
+        }));
+      return { ok: true, data: { logs, siteId: siteId || undefined, limit } };
+    }
+
+    case 'list-flows': {
+      const flows = await getFlows();
+      return { ok: true, data: { flows: flows.map(summarizeFlow) } };
+    }
+
+    case 'get-flow': {
+      const flowId = String(args.flowId || '').trim();
+      const flow = (await getFlows()).find((item) => item.id === flowId);
+      if (!flow) return { ok: false, error: `流程 ${flowId} 已不存在` };
+      return { ok: true, data: { flow: redactAgentValue(flow) as Record<string, unknown> } };
     }
 
     case 'create-procedure': {
@@ -699,6 +1003,50 @@ export async function executeSkill(
       return {
         ok: true,
         data: { procedureId: saved.id, stepCount: saved.steps.length },
+        touched: [{ kind: 'procedure', id: saved.id, name: saved.name }],
+      };
+    }
+
+    case 'replace-steps': {
+      const proc = await getProcedure(String(args.procedureId));
+      if (!proc) return { ok: false, error: `技能 ${String(args.procedureId)} 已不存在` };
+      if (!Array.isArray(args.steps)) return { ok: false, error: 'steps 必须是数组' };
+      proc.steps = args.steps as Step[];
+      // 标准步骤序列是唯一事实来源；替换为标准步骤后不要继续执行旧脚本。
+      proc.script = '';
+      const saved = await upsertProcedure(proc);
+      report(`已重写「${saved.name}」的 ${saved.steps.length} 个步骤`);
+      return {
+        ok: true,
+        data: { procedureId: saved.id, stepCount: saved.steps.length, steps: saved.steps },
+        touched: [{ kind: 'procedure', id: saved.id, name: saved.name }],
+      };
+    }
+
+    case 'update-procedure': {
+      const proc = await getProcedure(String(args.procedureId));
+      if (!proc) return { ok: false, error: `技能 ${String(args.procedureId)} 已不存在` };
+      if (args.name !== undefined) {
+        const name = String(args.name).trim();
+        if (!name) return { ok: false, error: '技能名称不能为空' };
+        proc.name = name;
+      }
+      if (args.description !== undefined) proc.description = String(args.description);
+      if (args.url !== undefined) proc.url = String(args.url).trim();
+      if (args.script !== undefined) proc.script = String(args.script);
+      if (args.clearScript === true) proc.script = '';
+      const saved = await upsertProcedure(proc);
+      report(`已更新技能「${saved.name}」`);
+      return {
+        ok: true,
+        data: {
+          procedureId: saved.id,
+          name: saved.name,
+          description: saved.description,
+          url: saved.url || '',
+          scriptLength: saved.script.length,
+          stepCount: saved.steps.length,
+        },
         touched: [{ kind: 'procedure', id: saved.id, name: saved.name }],
       };
     }
@@ -801,8 +1149,30 @@ export async function executeSkill(
     }
 
     case 'create-flow': {
-      const procIds = toStringArray(args.procedureIds);
+      const allSites = await getSites();
       const all = await getProcedures();
+      const siteScope = String(args.siteScope || 'explicit');
+      const includeDisabled = args.includeDisabled === true;
+      const includeMissingSiteId = args.includeMissingSiteId === true;
+      const includeLoginProcedures = args.includeLoginProcedures === true;
+      let procIds = toStringArray(args.procedureIds);
+      const siteSync = siteScope === 'all-sites' ? {
+        mode: 'all-sites' as const,
+        includeDisabled,
+        includeMissingSiteId,
+        includeLoginProcedures,
+        autoSync: args.autoSyncSites === true,
+      } : undefined;
+      if (siteScope === 'all-sites') {
+        const allowedSites = allSites.filter((site) => includeDisabled || site.enabled);
+        const candidates = all.filter((procedure) => {
+          if (!includeLoginProcedures && procedure.kind === 'login') return false;
+          if (!procedure.siteId) return includeMissingSiteId;
+          return allowedSites.some((site) => site.id === procedure.siteId);
+        });
+        procIds = candidates.map((procedure) => procedure.id);
+        if (procIds.length === 0) return { ok: false, error: '当前站点范围内没有可编排的技能；请确认站点已启用且技能已归属网站' };
+      }
       // 串行链：start → 每个技能一个节点 → end，节点坐标按顺序铺开
       const nodes: import('./models.js').FlowNode[] = [];
       const edges: import('./models.js').FlowEdge[] = [];
@@ -834,12 +1204,61 @@ export async function executeSkill(
         description: args.description ? String(args.description) : '',
         nodes,
         edges,
+        siteSync,
       });
       const saved = await saveFlow(flow);
       report(`已创建流程「${saved.name}」`);
       return {
         ok: true,
         data: { flowId: saved.id, name: saved.name, nodeCount: saved.nodes.length },
+        touched: [{ kind: 'flow', id: saved.id, name: saved.name }],
+      };
+    }
+
+    case 'update-flow-node': {
+      const flowId = String(args.flowId || '').trim();
+      const nodeId = String(args.nodeId || '').trim();
+      const flow = (await getFlows()).find((item) => item.id === flowId);
+      if (!flow) return { ok: false, error: `流程 ${flowId} 已不存在` };
+      const node = flow.nodes.find((item) => item.id === nodeId);
+      if (!node) return { ok: false, error: `流程「${flow.name}」中不存在节点 ${nodeId}` };
+      const data = args.data as Record<string, unknown>;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        return { ok: false, error: 'update-flow-node 的 data 必须是对象' };
+      }
+      // 流程节点同时保存 siteId + procedureId。定点修复也必须沿用这条
+      // 归属约束，避免 AI 把其他网站的技能误接到当前节点后才在运行期失败。
+      const nextProcedureId = data.procedureId === undefined
+        ? String(node.data?.procedureId || '').trim()
+        : String(data.procedureId || '').trim();
+      const nextSiteId = data.siteId === undefined
+        ? String(node.data?.siteId || '').trim()
+        : String(data.siteId || '').trim();
+      if (node.type === 'procedure' || data.procedureId !== undefined) {
+        if (!nextProcedureId) return { ok: false, error: '技能节点必须保留 procedureId，请先从 get-flow 获取真实技能 id' };
+        const procedure = await getProcedure(nextProcedureId);
+        if (!procedure) return { ok: false, error: `技能 ${nextProcedureId} 不存在，请先用 list-procedures 获取真实 id` };
+        if (!nextSiteId) return { ok: false, error: '技能节点必须同时绑定 siteId' };
+        if (!(await getSites()).some((site) => site.id === nextSiteId)) {
+          return { ok: false, error: `站点 ${nextSiteId} 不存在，请先用 list-sites 获取真实 id` };
+        }
+        if (procedure.siteId !== nextSiteId) {
+          return { ok: false, error: `技能「${procedure.name}」不属于站点 ${nextSiteId}，不能绑定到该节点` };
+        }
+        if (procedure.kind === 'login') {
+          return { ok: false, error: '流程节点不能直接调用登录技能，请调用自动化技能或执行站点' };
+        }
+      } else if (node.type === 'site' && data.siteId !== undefined) {
+        if (!nextSiteId || !(await getSites()).some((site) => site.id === nextSiteId)) {
+          return { ok: false, error: `站点 ${nextSiteId || '(空)'} 不存在，请先用 list-sites 获取真实 id` };
+        }
+      }
+      node.data = { ...(node.data || {}), ...data };
+      const saved = await saveFlow(flow);
+      report(`已更新流程「${saved.name}」的节点 ${nodeId}`);
+      return {
+        ok: true,
+        data: { flowId: saved.id, nodeId, nodeType: node.type, data: redactAgentValue(node.data) as Record<string, unknown> },
         touched: [{ kind: 'flow', id: saved.id, name: saved.name }],
       };
     }
@@ -861,8 +1280,8 @@ export async function executeSkill(
           data: {
             url: state.url,
             title: state.title,
-            text: (state.text || '').slice(0, 1500),
-            elements: (state.elements || []).slice(0, 30),
+            text: String(redactAgentValue(state.text || '')).slice(0, 1500),
+            elements: redactPageElements((state.elements || []).slice(0, 30)),
           },
         };
       } catch (e) {
@@ -870,6 +1289,110 @@ export async function executeSkill(
       } finally {
         // 只是看一眼，看完就关，不给用户留一堆标签
         if (tab) await tab.close().catch(() => {});
+      }
+    }
+
+    case 'test-procedure': {
+      const procedureId = String(args.procedureId || '').trim();
+      const procedure = await getProcedure(procedureId);
+      if (!procedure) return { ok: false, error: `技能 ${procedureId} 已不存在` };
+      if (procedure.kind === 'login') {
+        return { ok: false, error: `登录技能不能独立测试，请测试绑定该登录技能的站点或包含它的流程` };
+      }
+      const site = procedure.siteId ? (await getSites()).find((item) => item.id === procedure.siteId) : undefined;
+      const url = String(args.url || procedure.url || site?.url || '').trim();
+      if (!url) return { ok: false, error: `技能「${procedure.name}」没有可测试的网址，请补充 url 或先完善技能配置` };
+      report(`开始测试技能「${procedure.name}」，会实时观察页面变化`);
+      try {
+        const { runProcedureStandalone } = await import('./run-context.js');
+        const result = await runProcedureStandalone(procedureId, {
+          url,
+          // 登录诊断必须让目标页进入前台：Chrome 密码管理器通常只会在可见
+          // 标签页完成自动填充，后台隔离标签会导致“已手动登录仍需登录”。
+          active: true,
+          keepTab: false,
+          diagnostic: true,
+          withSiteLogin: true,
+          onObservation: (observation) => report(summarizeObservation(observation)),
+        });
+        const observations = result.observations || [];
+        const loginRequired = result.status === 'need_login' || /登录|未登录|login\s*(required|failed)|sign\s*in|OAuth.*超时|授权.*超时/i.test(result.message || '');
+        const loginSignals = loginRequired ? inferLoginPageSignals(observations) : {
+          hasPasswordField: false,
+          hasLoginButton: false,
+          ordinaryFormLikely: false,
+        };
+        // 测试不写回技能执行历史，但“需要登录”是站点级运行状态，必须让站点列表
+        // 明确显示出来，用户可从站点卡片打开真实页面完成 Chrome 自动填充后的登录。
+        if (loginRequired && site) {
+          await updateSiteLastResult(site.id, {
+            status: 'need_login',
+            message: '需要登录：请在站点页面完成登录后再测试或执行',
+            at: Date.now(),
+          });
+        }
+        const data = {
+          testOk: result.ok,
+          status: result.status,
+          message: result.message,
+          siteId: site?.id || procedure.siteId || '',
+          siteName: site?.name || '',
+          loginRequired,
+          loginHint: loginRequired
+            ? '请在站点页面完成登录。普通表单登录可使用 Chrome 已保存的账号密码自动填充；扩展不会读取或上传密码。'
+            : '',
+          loginSignals,
+          procedureId,
+          procedureName: procedure.name,
+          failedStepIndex: result.failedStepIndex,
+          failedStepType: result.failedStepType,
+          observations: compactObservations(observations),
+        };
+        report(result.ok ? `技能「${procedure.name}」测试通过` : `技能「${procedure.name}」测试失败：${result.message}`);
+        // 工具本身已成功完成诊断，即使被测技能失败也把报告作为正常数据回灌，
+        // 这样 Agent 能基于页面事实选择 get-procedure / update-step / replace-steps。
+        if (loginRequired) {
+          return {
+            ok: true,
+            data,
+            halt: 'ask',
+            text: `站点「${site?.name || procedure.siteId || '当前站点'}」需要登录。请在站点列表的“需要登录”提示中点击“打开站点并登录”，Chrome 可自动填充已保存的账号密码；完成后点击登录，再发送“继续测试”。扩展不会读取或上传密码。`,
+          };
+        }
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, error: `测试技能失败：${(e as Error)?.message || String(e)}` };
+      }
+    }
+
+    case 'test-flow': {
+      const flowId = String(args.flowId || '').trim();
+      const flow = (await getFlows()).find((item) => item.id === flowId);
+      if (!flow) return { ok: false, error: `流程 ${flowId} 已不存在` };
+      report(`开始测试流程「${flow.name}」，将复用正式 React Flow 执行引擎`);
+      try {
+        const result = await runFlowTest(flowId, ctx.signal, (message) => {
+          // 流程执行日志会实时回流；先做同样的敏感值遮盖，避免 HTTP 响应或
+          // 变量摘要在最终报告返回前短暂暴露给模型/会话历史。
+          report(String(redactAgentValue(message)));
+        });
+        report(result.ok ? `流程「${flow.name}」测试通过` : `流程「${flow.name}」测试失败：${result.message}`);
+        return {
+          ok: true,
+          data: {
+            testOk: result.ok,
+            flowId,
+            flowName: flow.name,
+            status: result.status,
+            message: result.message,
+            logs: redactAgentValue(result.logs.slice(-120)),
+            nodeReports: redactAgentValue(result.nodeReports || []),
+            summary: result.summary,
+            variables: redactAgentValue(result.variables) as Record<string, unknown>,
+          },
+        };
+      } catch (e) {
+        return { ok: false, error: `测试流程失败：${(e as Error)?.message || String(e)}` };
       }
     }
 

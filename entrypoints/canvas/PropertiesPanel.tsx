@@ -74,24 +74,6 @@ function NodeFields({
         </Field>
         <Field label="消息"><Input value={String(data.message ?? '')} onChange={(event) => update({ message: event.target.value })} /></Field>
       </>;
-    case 'extract':
-      return <>
-        <Field label="CSS / XPath 选择器" hint="支持 body、.class、#id 等 CSS；XPath 可使用 xpath:/... 前缀。">
-          <Input value={String(data.selector ?? 'body')} onChange={(event) => update({ selector: event.target.value })} placeholder="body" />
-        </Field>
-        <Field label="提取模式">
-          <select value={data.mode ?? 'text'} onChange={(event) => update({ mode: event.target.value as FlowNodeData['mode'] })}>
-            <option value="text">文本内容</option>
-            <option value="html">HTML</option>
-            <option value="list">列表数据</option>
-            <option value="table">表格数据</option>
-            <option value="attribute">元素属性</option>
-          </select>
-        </Field>
-        {data.mode === 'attribute' ? <Field label="属性名"><Input value={String(data.attribute ?? '')} onChange={(event) => update({ attribute: event.target.value })} placeholder="href" /></Field> : null}
-        <Field label="写入变量名"><Input value={String(data.variable ?? 'extracted')} onChange={(event) => update({ variable: event.target.value })} placeholder="extracted" /></Field>
-        <label className="check-field"><input type="checkbox" checked={Boolean(data.multiple)} onChange={(event) => update({ multiple: event.target.checked })} />匹配所有元素（返回数组）</label>
-      </>;
     case 'request':
     case 'http':
       return <>
@@ -191,6 +173,16 @@ export function PropertiesPanel({
       <h3>{meta.icon} {meta.label}</h3>
       <Field label="节点标签"><Input value={String(node.data.label ?? '')} onChange={(event) => onNodeData(node.id, { label: event.target.value })} /></Field>
       <NodeFields node={node} procedures={procedures} sites={sites} update={(patch) => onNodeData(node.id, patch)} />
+      {isExecutableNode(node.type) ? <>
+        <Separator className="properties-separator" />
+        <h4>执行策略</h4>
+        <Field label="节点超时（毫秒）" hint="节点级总超时，超时后会清理后台标签页。">
+          <Input type="number" min={1000} value={String(node.data.nodeTimeoutMs ?? 120000)} onChange={(event) => onNodeData(node.id, { nodeTimeoutMs: Number(event.target.value) || 120000 })} />
+        </Field>
+        <Field label="重试次数"><Input type="number" min={0} max={10} value={String(node.data.retryCount ?? 0)} onChange={(event) => onNodeData(node.id, { retryCount: Number(event.target.value) || 0 })} /></Field>
+        <Field label="重试间隔（毫秒）"><Input type="number" min={0} value={String(node.data.retryDelayMs ?? 1000)} onChange={(event) => onNodeData(node.id, { retryDelayMs: Number(event.target.value) || 0 })} /></Field>
+        <label className="check-field"><input type="checkbox" checked={node.data.continueOnError !== false} onChange={(event) => onNodeData(node.id, { continueOnError: event.target.checked })} />失败后继续执行后续节点</label>
+      </> : null}
       <Separator className="properties-separator" />
       <div className="panel-actions">
         <Button variant="outline" onClick={() => onDuplicate(node.id)}><Copy />复制</Button>
@@ -198,4 +190,8 @@ export function PropertiesPanel({
       </div>
     </div>
   );
+}
+
+function isExecutableNode(type: string): boolean {
+  return ['procedure', 'site', 'request', 'http', 'delay', 'variable', 'condition', 'loop'].includes(type);
 }

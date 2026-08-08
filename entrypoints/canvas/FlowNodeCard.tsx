@@ -22,7 +22,6 @@ function Summary({ type, data }: { type: string; data: FlowNodeData }) {
     case 'delay': return row('等待', `${data.ms ?? 1000} ms`);
     case 'variable': return data.name ? row(data.name, data.value) : <em>未设置变量</em>;
     case 'log': return row('日志', data.message || '(空)');
-    case 'extract': return <>{row('选择器', data.selector || 'body')}{row('变量', data.variable || '?')}</>;
     case 'request':
     case 'http': return <>{row('请求', `${data.method || 'GET'} ${data.url || '(未设置)'}`)}{row('变量', data.variable || '?')}</>;
     case 'procedure': {
@@ -43,6 +42,7 @@ function Summary({ type, data }: { type: string; data: FlowNodeData }) {
 function FlowNodeCard({ data, type, selected }: NodeProps<CanvasNode>) {
   const meta = typeMeta(type);
   const mark = data.runMark ?? 'idle';
+  const report = data.lastReport;
   return (
     <div className={`flow-node flow-node-${meta.type} run-${mark}${selected ? ' selected' : ''}`}>
       <Handle type="target" position={Position.Left} className="flow-handle" />
@@ -51,7 +51,7 @@ function FlowNodeCard({ data, type, selected }: NodeProps<CanvasNode>) {
         <span className="flow-node-title">{data.label || meta.label}</span>
         <small>{meta.type}</small>
       </div>
-      <div className="flow-node-body"><Summary type={meta.type} data={data} /></div>
+      <div className="flow-node-body"><Summary type={meta.type} data={data} />{report && mark !== 'idle' ? <div className="node-summary-report">{report.durationMs}ms{report.errorType ? ` · ${report.errorType}` : ''}</div> : null}</div>
       <Handle type="source" position={Position.Right} className="flow-handle" />
     </div>
   );

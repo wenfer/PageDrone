@@ -711,7 +711,7 @@ function renderNodeProps(container) {
         }, '留空时使用任务步骤/绑定站点的网址'));
         if (proc) {
           if (proc.kind === 'login') {
-            hint(container, '登录任务不能独立运行，请在站点或流程中配合自动化任务使用。');
+            hint(container, '登录技能不能独立运行，请在站点或流程中配合自动化技能使用。');
           } else if (d.url) {
             hint(container, '运行时会在新标签页打开此网址并执行任务步骤。');
           } else {
@@ -1346,7 +1346,7 @@ async function execNode(node) {
       const proc = state.procedures.find((p) => p.id === d.procedureId);
       if (!proc) throw new Error('任务不存在（可能已被删除）');
       if (proc.kind === 'login') {
-        throw new Error('登录任务不能独立运行，请改用「执行站点」或在站点中绑定登录任务');
+        throw new Error('登录技能不能独立运行，请改用「执行站点」或在站点中绑定登录技能');
       }
       const url = (interpolate(d.url || '') || '').trim() || deriveProcUrl(d.procedureId).url;
       if (url) {

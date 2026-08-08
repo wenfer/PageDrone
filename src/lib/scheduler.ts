@@ -1,11 +1,11 @@
 /**
- * 调度与汇总：alarms 重建、alarm 触发、工具栏徽标、完成通知。
+ * 调度与汇总：alarms 重建、alarm 触发、完成通知。
  * 与队列执行分离——这里只负责「何时跑」与「跑完怎么提示」。
  */
 
 import { getSites } from './storage.js';
-import { enqueueSites, isQueueRunning } from './execution-queue.js';
-import type { Settings, Site, Log } from './models.js';
+import { enqueueSites } from './execution-queue.js';
+import type { Settings, Log } from './models.js';
 
 function notify(settings: Settings, id: string, title: string, message: string): void {
   if (settings && settings.notifyOnError === false) return;
@@ -34,31 +34,6 @@ export async function notifySummary(results: Log[], settings: Settings): Promise
     '自动执行完成',
     `成功 ${ok}，失败/其它 ${fail}，共 ${results.length} 个站点`
   );
-}
-
-export async function updateBadgeFromLogs(): Promise<void> {
-  try {
-    const sites = await getSites();
-    const fails = sites.filter(
-      (s: Site) =>
-        s.enabled &&
-        s.lastResult &&
-        s.lastResult.status &&
-        s.lastResult.status !== 'success' &&
-        s.lastResult.status !== 'skipped'
-    ).length;
-    if (isQueueRunning()) {
-      await chrome.action.setBadgeText({ text: '…' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#2563eb' });
-    } else if (fails > 0) {
-      await chrome.action.setBadgeText({ text: String(Math.min(fails, 99)) });
-      await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
-    } else {
-      await chrome.action.setBadgeText({ text: '' });
-    }
-  } catch {
-    /* ignore */
-  }
 }
 
 function nextDailyOccurrence(hour = 8, minute = 0): number {

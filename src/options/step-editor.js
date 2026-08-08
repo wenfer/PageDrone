@@ -16,9 +16,9 @@ const STEP_UI = {
     mainLabel: '要点击的目标（CSS 或 XPath）',
     extraLabel: '回调 URL 片段（可选）',
     mainPh: 'CSS: .checkin   或 XPath: //button[contains(.,"执行")]',
-    extraPh: 'OAuth 时可填回调地址关键字',
+    extraPh: '弹窗登录/授权时可填回调地址关键字',
     timeout: 15000,
-    desc: '点击匹配元素。默认会自动等待页面重定向/刷新完成；若弹出 OAuth 窗口请勾「监视弹窗」。',
+    desc: '点击匹配元素。默认会自动等待页面重定向/刷新完成；如果登录会打开新窗口，请勾「监视弹窗」。',
   },
   wait: {
     mainLabel: '（本步不需要选择器）',
@@ -64,9 +64,9 @@ const STEP_UI = {
     mainLabel: '完成后应出现的元素（可选）',
     extraLabel: '给你看的提示文案',
     mainPh: '例如 .avatar',
-    extraPh: '例如：请完成 OAuth 登录',
+    extraPh: '例如：请完成当前页面登录',
     timeout: 180000,
-    desc: '扩展会暂停并把标签页弹到前台，等你手动操作（登录、验证码、OAuth 授权）。',
+    desc: '扩展会暂停并把标签页弹到前台；登录技能会尝试提交 Chrome 已自动填充的普通表单，其他情况等待你手动完成登录、验证码或页面操作。OAuth 只是可选的登录方式。',
   },
 };
 
@@ -189,7 +189,7 @@ export function collectSteps(listEl) {
       return { type, match: selector || extra, timeoutMs: timeoutMs || 60000 };
     }
     if (type === 'manual') {
-      const message = extra || '请完成登录或 OAuth 授权';
+      const message = extra || '请完成当前页面要求的登录或其他人工操作';
       const match = node.dataset.match || (extra && !selector && !/\s/.test(extra) ? extra : '') || '';
       return { type, message, match, selector: selector || '', timeoutMs: timeoutMs || 180000 };
     }

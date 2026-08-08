@@ -13,11 +13,12 @@ import {
   removeProcedure,
 } from '../lib/storage.js';
 import { enqueueSites, isQueueRunning, stopQueue } from '../lib/execution-queue.js';
-import { rescheduleAllAlarms, handleAlarm, updateBadgeFromLogs } from '../lib/scheduler.js';
-import { runProcedureStandalone, resolveIntervention } from '../lib/run-context.js';
+import { rescheduleAllAlarms, handleAlarm } from '../lib/scheduler.js';
+import { runProcedureStandalone, abortStandaloneRun, resolveIntervention } from '../lib/run-context.js';
 import { runMigrations } from '../lib/migrate.js';
 import { fetchMarketIndex, installFromMarket } from '../lib/market.js';
 import { getFlows, saveFlow, deleteFlow } from '../lib/flows.js';
+import { reportFlowTestProgress, resolveFlowTestResult } from '../lib/flow-test.js';
 import { exploreAndGenerate, abortExploration } from '../lib/explorer.js';
 import {
   startAgentMessage,
@@ -38,7 +39,6 @@ import {
 } from '../lib/recorder.js';
 import { createProcedure } from '../lib/models.js';
 import type { MessageRequest, Settings, Step } from '../lib/types.js';
-import { pageExtractData, type PageExtractOptions, type PageExtractResult } from '../lib/page/extract.js';
 
 /** handleMessage 的返回值统一被展开进 { ok: true, ... } 响应体 */
 type MessageResult = Record<string, unknown>;
@@ -56,9 +56,9 @@ function llmClientFromSettings(settings: Settings): LlmClient {
 
 async function bootstrap(): Promise<void> {
   await runMigrations();
+  await chrome.action.setBadgeText({ text: '' });
   await setRuntime({ state: RUN_STATE.IDLE, message: '已就绪', queue: [] });
   await rescheduleAllAlarms();
-  await updateBadgeFromLogs();
 }
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -107,22 +107,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 function errText(err: unknown): string {
   return (err as Error)?.message || String(err);
-}
-
-/** Resolve a page tab for a data-extraction node. */
-async function resolveExtractionTab(tabId?: number): Promise<number> {
-  if (Number.isInteger(tabId) && (tabId as number) > 0) {
-    try {
-      const tab = await chrome.tabs.get(tabId as number);
-      if (tab.id == null) throw new Error('目标标签页不存在');
-      return tab.id;
-    } catch {
-      throw new Error('目标标签页已关闭，请先执行打开页面或技能节点');
-    }
-  }
-  const active = (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
-  if (active?.id == null) throw new Error('没有可用的活动标签页');
-  return active.id;
 }
 
 /**
@@ -240,6 +224,18 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return true;
   }
 
+  // 诊断画布把实时日志和最终报告回传给等待中的 AI 工具；不进入普通 CRUD handler。
+  if (type === MSG.FLOW_TEST_PROGRESS) {
+    const accepted = reportFlowTestProgress(msg.requestId, msg.message);
+    sendResponse({ ok: accepted });
+    return true;
+  }
+  if (type === MSG.FLOW_TEST_RESULT) {
+    const accepted = resolveFlowTestResult(msg.requestId, msg.report);
+    sendResponse({ ok: accepted });
+    return true;
+  }
+
   handleMessage(msg)
     .then((result) => sendResponse({ ok: true, ...result }))
     .catch((err: unknown) => sendResponse({ ok: false, error: errText(err) }));
@@ -311,8 +307,15 @@ async function handleMessage(message: MessageRequest): Promise<MessageResult> {
         keepTab: !!message.keepTab,
         active: message.active !== false,
         watchDeviation: !!message.watchDeviation,
+        diagnostic: message.diagnostic === true,
+        withSiteLogin: message.withSiteLogin === true,
+        executionId: message.executionId,
       });
       return { ...result };
+    }
+    case MSG.RUN_PROCEDURE_ABORT: {
+      if (!message.executionId) throw new Error('缺少 executionId');
+      return { aborted: abortStandaloneRun(message.executionId) };
     }
 
     // —— Market ——
@@ -323,7 +326,10 @@ async function handleMessage(message: MessageRequest): Promise<MessageResult> {
     case MSG.MARKET_INSTALL: {
       if (!message.marketId) throw new Error('缺少 marketId');
       if (!message.siteId) throw new Error('请先选择网站');
-      const result = await installFromMarket(message.marketId, message.siteId);
+      const result = await installFromMarket(message.marketId, message.siteId, {
+        download: message.download,
+        version: message.version,
+      });
       return result;
     }
 
@@ -343,35 +349,7 @@ async function handleMessage(message: MessageRequest): Promise<MessageResult> {
       return { deleted: true };
     }
 
-    // —— 流程数据采集与接口请求 ——
-    case MSG.EXTRACT_PAGE_DATA: {
-      const selector = String(message.selector || '').trim();
-      if (!selector) throw new Error('缺少提取选择器');
-      const tabId = await resolveExtractionTab(message.tabId);
-      const tab = await chrome.tabs.get(tabId);
-      const pageUrl = tab.url || tab.pendingUrl || '';
-      if (!/^https?:\/\//i.test(pageUrl)) {
-        throw new Error('当前页面不支持注入提取（请先打开 http(s) 页面）');
-      }
-      const options: PageExtractOptions = {
-        selector,
-        mode: message.mode,
-        attribute: message.attribute,
-        multiple: message.multiple,
-      };
-      const result = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: pageExtractData,
-        args: [options],
-      });
-      const extracted = (result[0]?.result || {
-        ok: false,
-        count: 0,
-        message: '页面没有返回提取结果',
-      }) as PageExtractResult;
-      return { ...extracted, tabId, pageUrl };
-    }
-
+    // —— 流程接口请求 ——
     case MSG.HTTP_REQUEST: {
       return await performHttpRequest({
         url: message.url,

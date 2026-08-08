@@ -15,7 +15,7 @@ import {
 } from './models.js';
 import { RUN_STATE, type RunState } from './messaging.js';
 import { convertV1Sites, normalizeProcedureSiteOwnership } from './v1-convert.js';
-import type { AgentChatSessionRecord } from './types.js';
+import type { AgentChatSessionRecord, FlowTestReport } from './types.js';
 
 const KEYS = {
   sites: 'sites',
@@ -26,10 +26,32 @@ const KEYS = {
   runtime: 'runtime',
   agentChatSessions: 'agentChatSessions',
   schemaVersion: 'schemaVersion',
+  flowTestReports: 'flowTestReports',
 } as const;
 
 const MAX_AGENT_CHAT_SESSIONS = 40;
 const MAX_AGENT_CHAT_TURNS = 120;
+const MAX_FLOW_TEST_REPORTS_PER_FLOW = 20;
+
+export async function getFlowTestReports(flowId?: string): Promise<Array<FlowTestReport & { id: string }>> {
+  const data = await chrome.storage.local.get(KEYS.flowTestReports);
+  const reports = Array.isArray(data[KEYS.flowTestReports]) ? data[KEYS.flowTestReports] as Array<FlowTestReport & { id: string }> : [];
+  return (flowId ? reports.filter((report) => report.flowId === flowId) : reports)
+    .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0));
+}
+
+export async function saveFlowTestReport(report: FlowTestReport): Promise<void> {
+  const data = await chrome.storage.local.get(KEYS.flowTestReports);
+  const reports = Array.isArray(data[KEYS.flowTestReports]) ? data[KEYS.flowTestReports] as Array<FlowTestReport & { id: string }> : [];
+  reports.unshift({ ...report, id: report.requestId || `${report.flowId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` });
+  const byFlow = new Map<string, Array<FlowTestReport & { id: string }>>();
+  for (const item of reports) {
+    const list = byFlow.get(item.flowId) ?? [];
+    if (list.length < MAX_FLOW_TEST_REPORTS_PER_FLOW) list.push(item);
+    byFlow.set(item.flowId, list);
+  }
+  await chrome.storage.local.set({ [KEYS.flowTestReports]: [...byFlow.values()].flat() });
+}
 
 export interface RuntimeStateShape {
   state: RunState;

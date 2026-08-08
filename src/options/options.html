@@ -169,19 +169,19 @@
                   </div>
                 </section>
 
-                <!-- ④ 登录任务 -->
+                <!-- ④ 登录技能 -->
                 <section class="card card-muted">
                   <header class="card-head">
                     <span class="card-num">4</span>
                     <div>
-                      <h3>登录任务 <span class="tag">可选</span></h3>
-                      <p>需要登录 / OAuth 的站点选择一个登录任务，执行中掉线会自动重登</p>
+                      <h3>登录技能 <span class="tag">可选</span></h3>
+                      <p>需要登录的站点选择一个登录技能，支持普通账号、人工登录、OAuth 等方式；执行中掉线会自动重登</p>
                     </div>
                   </header>
                   <div class="card-body">
                     <div class="proc-pick">
                       <select name="loginProcedureId" id="f-loginProc" class="proc-select">
-                        <option value="">（不使用登录任务）</option>
+                        <option value="">（不使用登录技能）</option>
                       </select>
                       <button type="button" id="btnNewLoginProc" class="btn btn-sm">＋ 新建</button>
                       <button type="button" id="btnEditLoginProc" class="btn btn-sm btn-ghost">编辑</button>
@@ -281,7 +281,7 @@
                         <label>类型</label>
                         <select name="kind" id="procKind">
                           <option value="checkin">任务</option>
-                          <option value="login">登录任务</option>
+                          <option value="login">登录技能</option>
                         </select>
                       </div>
                     </div>
@@ -716,7 +716,7 @@
           </div>
           <div class="step-row step-row-sub">
             <div class="step-flags">
-              <label class="check step-flag" title="点击后监视 OAuth 新标签">
+              <label class="check step-flag" title="点击后监视登录或授权新标签">
                 <input type="checkbox" class="step-watch-popup" /> 监视弹窗
               </label>
               <label class="check step-flag" title="点击后等待整页跳转">

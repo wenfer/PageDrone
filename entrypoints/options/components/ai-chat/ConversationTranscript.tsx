@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  BrainCircuit,
   Bot,
   CheckCircle2,
   ChevronRight,
@@ -16,8 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { ChatTurn, SkillTrace } from '../../../../src/lib/types.js';
-import { formatMessageDate, formatMessageTime, renderTraceArgs, sameCalendarDay } from './utils';
+import type { AgentThinkingStep, ChatTurn, SkillTrace } from '../../../../src/lib/types.js';
+import { formatMessageDate, formatMessageTime, redactValue, renderTraceArgs, sameCalendarDay } from './utils';
 
 type TouchedEntity = NonNullable<ChatTurn['touched']>[number];
 
@@ -26,6 +27,8 @@ interface ConversationTranscriptProps {
   pendingTurn: ChatTurn | null;
   busy: boolean;
   progress: string;
+  thinkingEnabled: boolean;
+  thinking: AgentThinkingStep[];
   error: string;
   apiConfigured: boolean;
   onUsePrompt: (prompt: string) => void;
@@ -44,6 +47,8 @@ export function ConversationTranscript({
   pendingTurn,
   busy,
   progress,
+  thinkingEnabled,
+  thinking,
   error,
   apiConfigured,
   onUsePrompt,
@@ -73,12 +78,13 @@ export function ConversationTranscript({
             </div>
           );
         })}
-        {busy ? (
+        {busy ? <div className="ai-chat-live-block">
           <div className="ai-chat-thinking" role="status">
             <span className="ai-chat-avatar assistant"><LoaderCircle className="spin" aria-hidden="true" /></span>
-            <div><strong>AI 助手正在处理</strong><p>{progress || '正在理解你的需求…'}</p></div>
+            <div><strong>{thinkingEnabled ? 'AI 助手正在思考' : 'AI 助手正在处理'}</strong><p>{progress || '正在理解你的需求…'}</p></div>
           </div>
-        ) : null}
+          {thinkingEnabled && thinking.length ? <ThinkingProcess steps={thinking} live /> : null}
+        </div> : null}
         {error ? <div className="ai-chat-inline-error"><XCircle aria-hidden="true" /><span>{error}</span></div> : null}
         <div ref={bottomRef} />
       </div>
@@ -99,6 +105,7 @@ function ChatEmptyState({ apiConfigured, onUsePrompt, onOpenSettings }: { apiCon
 function Message({ turn, pending, onOpenEntity }: { turn: ChatTurn; pending: boolean; onOpenEntity: (entity: TouchedEntity) => void }) {
   const user = turn.role === 'user';
   const status = turn.status;
+  const thinking = user ? [] : thinkingStepsForTurn(turn);
   return <article className={`ai-chat-message ${user ? 'user' : 'assistant'}${status === 'error' ? ' has-error' : ''}`}>
     <span className={`ai-chat-avatar ${user ? 'user' : 'assistant'}`}>{user ? <User aria-hidden="true" /> : <Bot aria-hidden="true" />}</span>
     <div className="ai-chat-message-main">
@@ -113,18 +120,60 @@ function Message({ turn, pending, onOpenEntity }: { turn: ChatTurn; pending: boo
           <TooltipContent>{new Date(turn.at).toLocaleString('zh-CN', { hour12: false })}</TooltipContent>
         </Tooltip>
       </header>
+      {thinking.length ? <ThinkingProcess steps={thinking} /> : null}
       <Card className="ai-chat-message-card"><CardContent><p>{turn.text}</p></CardContent></Card>
-      {turn.traces?.length ? <SkillTimeline traces={turn.traces} /> : null}
+      {turn.traces?.length ? <SkillTimeline traces={turn.traces} showThought={!thinking.length} /> : null}
       {turn.touched?.length ? <div className="ai-chat-touched"><span>本轮涉及</span>{turn.touched.map((entity) => <Button key={`${entity.kind}:${entity.id}`} variant="outline" size="sm" onClick={() => onOpenEntity(entity)}>{entityLabel(entity.kind)}：{entity.name}<ExternalLink aria-hidden="true" /></Button>)}</div> : null}
     </div>
   </article>;
 }
 
-function SkillTimeline({ traces }: { traces: SkillTrace[] }) {
+function thinkingStepsForTurn(turn: ChatTurn): AgentThinkingStep[] {
+  if (turn.thinking?.length) return turn.thinking;
+  return (turn.traces || []).flatMap((trace, index) => trace.thought ? [{
+    id: `legacy-thinking-${turn.id}-${index}`,
+    turn: index + 1,
+    stage: 'decision' as const,
+    title: `决定调用 ${trace.skill}`,
+    detail: trace.thought,
+    skill: trace.skill,
+    ok: trace.ok,
+    at: turn.at,
+  }] : []);
+}
+
+const THINKING_STAGE_LABEL: Record<AgentThinkingStep['stage'], string> = {
+  thinking: '分析',
+  decision: '决策',
+  repair: '自我修正',
+  result: '结果反馈',
+};
+
+function ThinkingProcess({ steps, live = false }: { steps: AgentThinkingStep[]; live?: boolean }) {
+  const [open, setOpen] = useState(live);
+  return <details className={`ai-chat-reasoning${live ? ' live' : ''}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <summary>
+      <span><BrainCircuit aria-hidden="true" />{live ? '思考过程 · 实时' : '思考过程'}</span>
+      <span className="ai-chat-reasoning-count">{steps.length} 步<ChevronRight aria-hidden="true" /></span>
+    </summary>
+    <div className="ai-chat-reasoning-list">
+      {steps.map((step, index) => <div className={`ai-chat-reasoning-step ${step.stage}${step.ok === false ? ' has-error' : ''}`} key={step.id}>
+        <span className="ai-chat-reasoning-index">{index + 1}</span>
+        <div>
+          <header><strong>{step.title}</strong><span>{THINKING_STAGE_LABEL[step.stage]}</span></header>
+          {step.detail ? <p>{String(redactValue(step.detail))}</p> : null}
+          {step.skill ? <code>{step.skill}</code> : null}
+        </div>
+      </div>)}
+    </div>
+  </details>;
+}
+
+function SkillTimeline({ traces, showThought = true }: { traces: SkillTrace[]; showThought?: boolean }) {
   const successful = traces.filter((trace) => trace.ok).length;
   return <details className="ai-chat-traces" open={traces.some((trace) => !trace.ok)}>
     <summary><span><Wrench aria-hidden="true" />AI 工具执行记录</span><Badge variant={successful === traces.length ? 'success' : 'warning'}>{successful}/{traces.length} 成功</Badge></summary>
-    <div className="ai-chat-trace-list">{traces.map((trace, index) => <div className={`ai-chat-trace ${trace.ok ? 'success' : 'error'}`} key={`${trace.skill}-${index}`}><span className="ai-chat-trace-marker">{trace.ok ? <CheckCircle2 aria-hidden="true" /> : <XCircle aria-hidden="true" />}</span><div><header><strong>{trace.skill}</strong><Badge variant={trace.ok ? 'success' : 'destructive'}>{trace.ok ? '执行成功' : '执行失败'}</Badge></header>{trace.thought ? <p className="ai-chat-trace-thought">{trace.thought}</p> : null}<div className="ai-chat-trace-result"><span>实际结果</span><p>{trace.summary || (trace.ok ? '技能返回成功，但没有附加摘要。' : '技能返回失败，但没有附加摘要。')}</p></div><details className="ai-chat-trace-args"><summary>查看调用参数（敏感字段已隐藏）</summary><pre>{renderTraceArgs(trace)}</pre></details></div></div>)}</div>
+    <div className="ai-chat-trace-list">{traces.map((trace, index) => <div className={`ai-chat-trace ${trace.ok ? 'success' : 'error'}`} key={`${trace.skill}-${index}`}><span className="ai-chat-trace-marker">{trace.ok ? <CheckCircle2 aria-hidden="true" /> : <XCircle aria-hidden="true" />}</span><div><header><strong>{trace.skill}</strong><Badge variant={trace.ok ? 'success' : 'destructive'}>{trace.ok ? '执行成功' : '执行失败'}</Badge></header>{showThought && trace.thought ? <p className="ai-chat-trace-thought">{trace.thought}</p> : null}<div className="ai-chat-trace-result"><span>实际结果</span><p>{trace.summary || (trace.ok ? '技能返回成功，但没有附加摘要。' : '技能返回失败，但没有附加摘要。')}</p></div><details className="ai-chat-trace-args"><summary>查看调用参数（敏感字段已隐藏）</summary><pre>{renderTraceArgs(trace)}</pre></details></div></div>)}</div>
   </details>;
 }
 

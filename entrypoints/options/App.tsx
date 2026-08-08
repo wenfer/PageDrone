@@ -46,7 +46,7 @@ import {
   type StepType,
   type Task,
 } from '../../src/lib/models.js';
-import { createFlow } from '../../src/lib/flows.js';
+import { createFlow, getFlows } from '../../src/lib/flows.js';
 import { exportAll, importSites } from '../../src/lib/storage.js';
 import { compareVersions, type MarketItem } from '../../src/lib/market.js';
 import type { ChatTurn, ExploreProgressEvent, InterventionContext, RecordingPreview, RuntimeState } from '../../src/lib/types.js';
@@ -123,16 +123,17 @@ function useExtensionState() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [status, local] = await Promise.all([
+    const [status, flowsFromStorage, local] = await Promise.all([
       send<StatusPayload>({ type: MSG.GET_STATUS }),
-      chrome.storage.local.get(['flows', 'logs', 'tasks']),
+      getFlows(),
+      chrome.storage.local.get(['logs', 'tasks']),
     ]);
     setSites(status.sites || []);
     setProcedures(status.procedures || []);
     setSettings({ ...defaultSettings(), ...(status.settings || {}) });
     setRuntime(status.runtime || EMPTY_RUNTIME);
     setQueueRunning(Boolean(status.queueRunning));
-    setFlows(Array.isArray(local.flows) ? local.flows as Flow[] : []);
+    setFlows(flowsFromStorage);
     setLogs(Array.isArray(local.logs) ? local.logs as Log[] : []);
     setTasks(Array.isArray(local.tasks) ? local.tasks as Task[] : []);
     setLoading(false);
@@ -168,6 +169,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(deepLinkedProcedure ? 'procedures' : 'overview');
   const [procedureLink, setProcedureLink] = useState(deepLinkedProcedure);
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
+  const [floatingAiOpen, setFloatingAiOpen] = useState(false);
+  const [floatingAiMounted, setFloatingAiMounted] = useState(false);
+  const floatingAiRef = useRef<HTMLDivElement>(null);
+  const floatingAiTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const followHash = () => {
@@ -182,6 +187,54 @@ export default function App() {
     setNotice({ text, error });
     window.setTimeout(() => setNotice(null), 3600);
   }, []);
+
+  const updateAgentThinkingMode = useCallback(async (enabled: boolean) => {
+    const next = { ...state.settings, agentThinkingMode: enabled };
+    try {
+      await chrome.storage.local.set({ settings: next });
+      state.applySettings(next);
+      notify(enabled ? '已开启 AI 对话思考模式' : '已切换为快速模式');
+    } catch (error) {
+      notify(`更新思考模式失败：${errorText(error)}`, true);
+    }
+  }, [notify, state.applySettings, state.settings]);
+
+  const openFloatingAi = () => {
+    setFloatingAiMounted(true);
+    setFloatingAiOpen(true);
+  };
+  const closeFloatingAi = useCallback(() => {
+    setFloatingAiOpen(false);
+    window.requestAnimationFrame(() => floatingAiTriggerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'agent' && floatingAiMounted) {
+      setFloatingAiOpen(false);
+      setFloatingAiMounted(false);
+    }
+  }, [floatingAiMounted, tab]);
+
+  useEffect(() => {
+    if (!floatingAiOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) closeFloatingAi();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    const frame = window.requestAnimationFrame(() => {
+      const root = floatingAiRef.current;
+      const composer = root?.querySelector<HTMLTextAreaElement>('textarea:not(:disabled)');
+      const closeButton = root?.querySelector<HTMLButtonElement>('[data-floating-ai-close]');
+      (composer || closeButton)?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('keydown', closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [closeFloatingAi, floatingAiOpen]);
 
   const runAll = async () => {
     try {
@@ -243,11 +296,21 @@ export default function App() {
           {!state.loading && tab === 'market' ? <MarketPanel sites={state.sites} procedures={state.procedures} notify={notify} /> : null}
           {!state.loading && tab === 'flows' ? <FlowsPanel flows={state.flows} notify={notify} /> : null}
           {!state.loading && tab === 'logs' ? <LogsPanel logs={state.logs} tasks={state.tasks} notify={notify} /> : null}
-          {!state.loading && tab === 'agent' ? <AiChatPanel settings={state.settings} runtime={state.runtime} notify={notify} onOpenSettings={() => setTab('settings')} onOpenEntity={openAiEntity} /> : null}
+          {!state.loading && tab === 'agent' ? <AiChatPanel settings={state.settings} runtime={state.runtime} notify={notify} onThinkingModeChange={(enabled) => void updateAgentThinkingMode(enabled)} onOpenSettings={() => setTab('settings')} onOpenEntity={openAiEntity} /> : null}
           {!state.loading && tab === 'data' ? <DataTransferPanel notify={notify} /> : null}
           {!state.loading && tab === 'settings' ? <SettingsPanel settings={state.settings} applySettings={state.applySettings} notify={notify} /> : null}
         </div>
       </main>
+      {tab !== 'agent' && !floatingAiOpen ? <button ref={floatingAiTriggerRef} type="button" className={`ai-floating-trigger${state.runtime.agentProgress ? ' busy' : ''}`} onClick={openFloatingAi} aria-label="打开 AI 对话" aria-haspopup="dialog" aria-expanded={floatingAiOpen}>
+        <Bot aria-hidden="true" />
+        <span className="ai-floating-trigger-copy"><strong>AI 对话</strong><small>{state.runtime.agentProgress ? '正在处理…' : '随时唤起'}</small></span>
+        {state.runtime.agentProgress ? <span className="ai-floating-live" aria-hidden="true" /> : null}
+      </button> : null}
+      {floatingAiMounted ? <div ref={floatingAiRef} className={`ai-floating-layer${floatingAiOpen ? ' open' : ''}`} aria-hidden={!floatingAiOpen} onMouseDown={(event) => { if (event.target === event.currentTarget) closeFloatingAi(); }}>
+        <section id="floating-ai-dialog" className="ai-floating-panel" role={floatingAiOpen ? 'dialog' : undefined} aria-modal={floatingAiOpen ? true : undefined} aria-label="浮动 AI 对话">
+          <AiChatPanel settings={state.settings} runtime={state.runtime} notify={notify} onClose={closeFloatingAi} onThinkingModeChange={(enabled) => void updateAgentThinkingMode(enabled)} onOpenSettings={() => { closeFloatingAi(); setTab('settings'); }} onOpenEntity={(entity) => { closeFloatingAi(); openAiEntity(entity); }} />
+        </section>
+      </div> : null}
       {notice ? <div className={notice.error ? 'toast error' : 'toast'} role="status">{notice.text}</div> : null}
     </div>
   );
@@ -374,6 +437,13 @@ function SitesPanel({ sites, procedures, settings, notify, onOpenProcedure }: { 
     try { await send({ type: MSG.RUN_SITE, siteId: draft.id, force: true }); notify('站点已加入执行队列'); }
     catch (error) { notify(errorText(error), true); }
   };
+  const openSiteLogin = async () => {
+    if (!draft?.url) return;
+    try {
+      await chrome.tabs.create({ url: draft.url, active: true });
+      notify('已打开站点页面；Chrome 可按浏览器设置自动填充保存的账号密码，请手动点击登录按钮');
+    } catch (error) { notify(`打开站点失败：${errorText(error)}`, true); }
+  };
 
   const siteSkills = draft ? procedures.filter((item) => item.siteId === draft.id) : [];
   const checkin = siteSkills.filter((item) => item.kind === 'checkin');
@@ -409,6 +479,7 @@ function SitesPanel({ sites, procedures, settings, notify, onOpenProcedure }: { 
           <div className="inline-options"><label><input type="checkbox" checked={draft.openInBackground} onChange={(e) => setDraft({ ...draft, openInBackground: e.target.checked })} /> 后台打开标签页</label><label><input type="checkbox" checked={draft.keepTabOnError} onChange={(e) => setDraft({ ...draft, keepTabOnError: e.target.checked })} /> 失败时保留标签页</label><label><input type="checkbox" checked={draft.schedule.enabled} onChange={(e) => setDraft({ ...draft, schedule: { ...draft.schedule, enabled: e.target.checked } })} /> 每日定时</label>{draft.schedule.enabled ? <input className="time-input" type="time" value={`${String(draft.schedule.hour).padStart(2, '0')}:${String(draft.schedule.minute).padStart(2, '0')}`} onChange={(e) => { const [hour, minute] = e.target.value.split(':').map(Number); setDraft({ ...draft, schedule: { ...draft.schedule, hour: hour || 0, minute: minute || 0 } }); }} /> : null}</div>
           <div className="form-actions"><button type="button" className="button danger ghost" onClick={remove}>删除</button><span className="grow" /><button type="button" className="button" onClick={run} disabled={!sites.some((item) => item.id === draft.id)}>立即测试</button><button className="button primary" type="submit">保存站点</button></div>
         </form>
+        {draft.lastResult?.status === 'need_login' ? <section className="site-login-alert"><div className="site-login-alert-copy"><span className="badge tone-error">需要登录</span><div><strong>该站点需要重新登录</strong><small>{draft.lastResult.message || '请先完成登录，再重新执行技能。'}</small></div></div><div className="form-actions"><button type="button" className="button primary small" onClick={() => void openSiteLogin()}>打开站点并登录</button>{draft.loginProcedureId ? <button type="button" className="button ghost small" onClick={() => onOpenProcedure(draft.loginProcedureId!)}>编辑登录技能</button> : null}</div></section> : null}
         {sites.some((item) => item.id === draft.id) ? <section className="site-skills-block">
           <div className="subsection-head"><div><h3>网站技能</h3><small>技能归属于当前网站，流程也会按网站筛选技能。</small></div><span className="badge tone-info">{siteSkills.length} 个</span></div>
           <div className="card-grid site-skill-grid">{siteSkills.map((skill) => <article className="entity-card" key={skill.id}><div><span className="badge tone-muted">{PROCEDURE_KIND_LABEL[skill.kind]}</span><h3>{skill.name}</h3><p>{skill.description || skill.url || '暂无说明'}</p></div><small>{skill.steps.length} 个步骤</small><div className="form-actions"><span className="grow" /><button type="button" className="button primary small" onClick={() => onOpenProcedure(skill.id)}>编辑技能</button></div></article>)}{!siteSkills.length ? <div className="empty compact wide">当前网站还没有技能，请从下方创建。</div> : null}</div>
@@ -494,7 +565,7 @@ function ProceduresPanel({ sites, procedures, settings, runtime, initialSelected
   const run = async () => {
     if (!draft) return;
     const siteUrl = sites.find((site) => site.id === draft.siteId)?.url || draft.url || '';
-    try { const result = await send<{ message?: string }>({ type: MSG.RUN_PROCEDURE, procedureId: draft.id, url: siteUrl, active: true, keepTab: true, watchDeviation: true }); notify(result.message || '技能执行完成'); }
+    try { const result = await send<{ message?: string }>({ type: MSG.RUN_PROCEDURE, procedureId: draft.id, url: siteUrl, active: true, keepTab: true, watchDeviation: true, withSiteLogin: true }); notify(result.message || '技能执行完成'); }
     catch (error) { notify(errorText(error), true); }
   };
   return (
@@ -543,8 +614,8 @@ function ProcedureForm({ draft, sites, setDraft, onSave, onDelete, onRun, persis
       <div className="subsection-head"><div><h3>技能返回值</h3><small>把提取操作或自定义脚本的结果暴露给流程节点与调用方</small></div><label className="switch"><input type="checkbox" checked={Boolean(output.enabled)} onChange={(e) => setDraft({ ...draft, output: { ...output, enabled: e.target.checked } })} />启用返回值</label></div>
       {output.enabled ? <div className="form-stack compact-stack"><Field label="返回字段（逗号分隔）" hint={outputNames.length ? `当前可用：${outputNames.join('、')}；留空返回全部结果。` : '提取步骤的变量名会自动成为可返回字段；脚本可通过 return 返回 result。'}><input value={output.fields.join(', ')} onChange={(e) => setDraft({ ...draft, output: { ...output, fields: e.target.value.split(/[,，]/).map((item) => item.trim()).filter(Boolean) } })} placeholder="items, title" /></Field></div> : null}
     </section>
-    {draft.kind === 'verification' ? <div className="form-grid two"><Field label="验证完成选择器"><input value={(detect as VerificationDetect).completedSelector} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as VerificationDetect), completedSelector: e.target.value } })} placeholder="例如 .dashboard 或 #verified" /></Field><Field label="验证完成 URL 包含"><input value={(detect as VerificationDetect).completedUrlIncludes} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as VerificationDetect), completedUrlIncludes: e.target.value } })} placeholder="例如 /dashboard" /></Field></div> : <div className="form-grid two"><Field label={draft.kind === 'login' ? '未登录关键词（逗号分隔）' : '成功关键词（逗号分隔）'}><input value={keywords.join(', ')} onChange={(e) => setKeywords(e.target.value)} /></Field>{draft.kind === 'login' ? <Field label="登录页 URL 模式"><input value={(detect as LoginDetect).loginUrlPattern} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as LoginDetect), loginUrlPattern: e.target.value } })} /></Field> : <Field label="失败关键词（逗号分隔）"><input value={(detect as CheckinDetect).failKeywords.join(', ')} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as CheckinDetect), failKeywords: e.target.value.split(/[,，]/).map((v) => v.trim()).filter(Boolean) } })} /></Field>}</div>}
-    <div className="subsection-head"><div><h3>执行步骤</h3><small>按顺序在目标页面执行</small></div><button type="button" className="button small" onClick={addStep}>添加步骤</button></div>
+    {draft.kind === 'verification' ? <div className="form-grid two"><Field label="验证完成选择器"><input value={(detect as VerificationDetect).completedSelector || ''} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as VerificationDetect), completedSelector: e.target.value } })} placeholder="例如 .dashboard 或 #verified" /></Field><Field label="验证完成 URL 包含"><input value={(detect as VerificationDetect).completedUrlIncludes || ''} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as VerificationDetect), completedUrlIncludes: e.target.value } })} placeholder="例如 /dashboard" /></Field></div> : draft.kind === 'login' ? <div className="form-grid two"><Field label="已登录选择器" hint="配置后，扩展能在开始前确认已登录；留空则不会强制触发登录技能"><input value={(detect as LoginDetect).loggedInSelector || ''} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as LoginDetect), loggedInSelector: e.target.value } })} placeholder="例如 .avatar 或 #account" /></Field><Field label="已登录 URL 包含"><input value={(detect as LoginDetect).loggedInUrlIncludes || ''} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as LoginDetect), loggedInUrlIncludes: e.target.value } })} placeholder="例如 /dashboard" /></Field><Field label="未登录关键词（逗号分隔）"><input value={keywords.join(', ')} onChange={(e) => setKeywords(e.target.value)} placeholder="例如：会话已过期, 登录后操作" /></Field><Field label="登录页 URL 模式"><input value={(detect as LoginDetect).loginUrlPattern || ''} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as LoginDetect), loginUrlPattern: e.target.value } })} placeholder="例如 /login 或 /auth/" /></Field></div> : <div className="form-grid two"><Field label="成功关键词（逗号分隔）"><input value={keywords.join(', ')} onChange={(e) => setKeywords(e.target.value)} /></Field><Field label="失败关键词（逗号分隔）"><input value={(detect as CheckinDetect).failKeywords.join(', ')} onChange={(e) => setDraft({ ...draft, detect: { ...(detect as CheckinDetect), failKeywords: e.target.value.split(/[,，]/).map((v) => v.trim()).filter(Boolean) } })} /></Field></div>}
+    <div className="subsection-head"><div><h3>执行步骤</h3><small>{draft.kind === 'login' ? '普通表单登录可只配置点击提交和等待结果，账号密码由 Chrome 自动填充；不要把密码写入技能。' : '按顺序在目标页面执行'}</small></div><button type="button" className="button small" onClick={addStep}>添加步骤</button></div>
     <div className="step-list">{draft.steps.map((step, index) => <StepRow key={`${index}-${step.type}`} step={step} index={index} onChange={(value) => updateStep(index, value)} onMove={(delta) => { const target = index + delta; if (target < 0 || target >= draft.steps.length) return; const steps = [...draft.steps]; [steps[index], steps[target]] = [steps[target]!, steps[index]!]; setDraft({ ...draft, steps }); }} onRemove={() => setDraft({ ...draft, steps: draft.steps.filter((_, i) => i !== index) })} />)}{!draft.steps.length ? <div className="empty compact">没有步骤，可仅使用下方自定义脚本</div> : null}</div>
     <Field label="自定义脚本（无步骤时执行）" hint={draft.steps.length ? '当前技能已有标准步骤，脚本不会执行；清空步骤后可将脚本作为高级兜底。' : '脚本仅在没有标准步骤时执行。'}><textarea className="code-input" rows={7} value={draft.script} onChange={(e) => setDraft({ ...draft, script: e.target.value })} spellCheck={false} /></Field>
     <div className="form-actions"><button type="button" className="button danger ghost" onClick={onDelete} disabled={!persisted}>删除</button><span className="grow" /><button type="button" className="button" onClick={onRun} disabled={!persisted}>运行技能</button><button className="button primary" type="submit">保存技能</button></div>
@@ -721,7 +792,13 @@ function MarketPanel({ sites, procedures, notify }: { sites: Site[]; procedures:
   const install = async (item: MarketItem) => {
     setInstalling(item.marketId);
     try {
-      const response = await send<{ procedure: Procedure; upgraded: boolean }>({ type: MSG.MARKET_INSTALL, marketId: item.marketId, siteId });
+      const response = await send<{ procedure: Procedure; upgraded: boolean }>({
+        type: MSG.MARKET_INSTALL,
+        marketId: item.marketId,
+        siteId,
+        download: item.download,
+        version: item.version,
+      });
       notify(response.upgraded ? `已升级“${response.procedure.name}”` : `已安装“${response.procedure.name}”`);
     } catch (error) { notify(errorText(error), true); }
     finally { setInstalling(''); }
@@ -864,7 +941,7 @@ function AiSettings({ draft, update, saveSettings, notify }: { draft: Settings; 
     catch (error) { notify(`获取模型失败：${errorText(error)}`, true); } finally { setFetching(false); }
   };
   const test = async () => { setTesting(true); try { await saveSettings(true); const result = await send<{ message?: string }>({ type: MSG.LLM_TEST, prompt: testPrompt.trim() }); notify(result.message || '连接测试成功'); } catch (error) { notify(`连接测试失败：${errorText(error)}`, true); } finally { setTesting(false); } };
-  return <section className="panel form-stack"><div className="section-head"><div><p className="eyebrow">Artificial intelligence</p><h2>AI 设置</h2></div><span className="privacy-note">API Key 仅保存在本机</span></div><div className="form-grid two"><Field label="Provider"><select value={draft.llmProvider} onChange={(e) => update('llmProvider', e.target.value as Settings['llmProvider'])}><option value="anthropic">Anthropic</option><option value="openai">OpenAI 兼容</option></select></Field><Field label="Base URL（留空使用官方地址）"><input value={draft.llmBaseUrl} onChange={(e) => update('llmBaseUrl', e.target.value)} placeholder={draft.llmProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com'} /></Field></div><Field label="API Key"><input type="password" autoComplete="off" value={draft.llmApiKey} onChange={(e) => update('llmApiKey', e.target.value)} placeholder="sk-…" /></Field><div className="model-row"><Field label="模型（可输入，也可展开选择）"><ModelCombobox value={draft.llmModel} models={models} onChange={(value) => update('llmModel', value)} /></Field><button type="button" className="button" onClick={fetchModels} disabled={fetching}>{fetching ? '获取中…' : '获取模型'}</button></div><Field label="自定义请求头（每行 Key: Value）"><textarea rows={4} value={draft.llmHeaders} onChange={(e) => update('llmHeaders', e.target.value)} placeholder={'X-Custom: value\nAuthorization: Bearer {{apiKey}}'} /></Field><div className="form-grid three"><NumberField label="AI 对话最大步骤" value={draft.agentMaxSteps} onChange={(v) => update('agentMaxSteps', v)} /><NumberField label="AI 对话超时（ms）" value={draft.agentTimeoutMs} onChange={(v) => update('agentTimeoutMs', v)} /><Field label="测试消息"><input value={testPrompt} onChange={(e) => setTestPrompt(e.target.value)} /></Field></div><div className="form-actions"><span className="grow" /><button type="button" className="button accent" onClick={test} disabled={testing}>{testing ? '测试中…' : '保存并测试连接'}</button></div></section>;
+  return <section className="panel form-stack"><div className="section-head"><div><p className="eyebrow">Artificial intelligence</p><h2>AI 设置</h2></div><span className="privacy-note">API Key 仅保存在本机</span></div><div className="form-grid two"><Field label="Provider"><select value={draft.llmProvider} onChange={(e) => update('llmProvider', e.target.value as Settings['llmProvider'])}><option value="anthropic">Anthropic</option><option value="openai">OpenAI 兼容</option></select></Field><Field label="Base URL（留空使用官方地址）"><input value={draft.llmBaseUrl} onChange={(e) => update('llmBaseUrl', e.target.value)} placeholder={draft.llmProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com'} /></Field></div><Field label="API Key"><input type="password" autoComplete="off" value={draft.llmApiKey} onChange={(e) => update('llmApiKey', e.target.value)} placeholder="sk-…" /></Field><div className="model-row"><Field label="模型（可输入，也可展开选择）"><ModelCombobox value={draft.llmModel} models={models} onChange={(value) => update('llmModel', value)} /></Field><button type="button" className="button" onClick={fetchModels} disabled={fetching}>{fetching ? '获取中…' : '获取模型'}</button></div><Field label="自定义请求头（每行 Key: Value）"><textarea rows={4} value={draft.llmHeaders} onChange={(e) => update('llmHeaders', e.target.value)} placeholder={'X-Custom: value\nAuthorization: Bearer {{apiKey}}'} /></Field><div className="form-grid three"><NumberField label="AI 对话最大步骤" value={draft.agentMaxSteps} onChange={(v) => update('agentMaxSteps', v)} /><NumberField label="AI 对话超时（ms）" value={draft.agentTimeoutMs} onChange={(v) => update('agentTimeoutMs', v)} /><Field label="测试消息"><input value={testPrompt} onChange={(e) => setTestPrompt(e.target.value)} /></Field></div><label className="switch ai-thinking-setting"><input type="checkbox" checked={draft.agentThinkingMode} onChange={(event) => update('agentThinkingMode', event.target.checked)} /><span><strong>AI 对话思考模式</strong><small>生成可公开的结构化决策摘要，并在对话中实时预览；不会展示模型内部隐藏推理。</small></span></label><div className="form-actions"><span className="grow" /><button type="button" className="button accent" onClick={test} disabled={testing}>{testing ? '测试中…' : '保存并测试连接'}</button></div></section>;
 }
 
 function ModelCombobox({ value, models, onChange }: { value: string; models: string[]; onChange: (value: string) => void }) {

@@ -298,6 +298,8 @@ export interface Settings {
   llmHeaders: string;
   agentMaxSteps: number;
   agentTimeoutMs: number;
+  /** 生成并展示可公开的结构化决策摘要，不包含模型内部隐藏推理。 */
+  agentThinkingMode: boolean;
 }
 
 // —— 流程（Flow）——
@@ -310,11 +312,14 @@ export interface FlowNode {
   data?: Record<string, unknown>;
 }
 
+/** 流程边的分支条件。持久化层与画布层共用这组值，避免各自维护一套默认图模型。 */
+export type FlowEdgeWhen = 'always' | 'true' | 'false';
+
 export interface FlowEdge {
   id: string;
   from: string;
   to: string;
-  when?: string;
+  when?: FlowEdgeWhen;
 }
 
 export interface Flow {
@@ -326,6 +331,14 @@ export interface Flow {
   variables: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
+  /** 可选：流程执行前动态同步站点节点的策略。 */
+  siteSync?: {
+    mode: 'manual' | 'all-sites';
+    includeDisabled: boolean;
+    includeMissingSiteId: boolean;
+    includeLoginProcedures: boolean;
+    autoSync: boolean;
+  };
 }
 
 // —— 工厂方法 ——
@@ -349,6 +362,7 @@ export function defaultSettings(): Settings {
     llmHeaders: '', // 留空使用默认请求头
     agentMaxSteps: 15,
     agentTimeoutMs: 300000,
+    agentThinkingMode: true,
   };
 }
 
@@ -364,19 +378,13 @@ export function defaultCheckinSteps(): Step[] {
   ];
 }
 
-/** 默认登录步骤（点击 OAuth 入口 → 人工授权） */
+/**
+ * 默认登录步骤。
+ * 登录方式由网站决定，OAuth 只是其中一种选择；登录技能不预置人工步骤。
+ * 执行器会在标准 click/wait 步骤之后自动提交 Chrome 已填充的普通登录表单。
+ */
 export function defaultLoginSteps(): Step[] {
-  return [
-    {
-      type: 'click',
-      selector: 'a[href*="oauth"], button.oauth, .login-oauth',
-      timeoutMs: 15000,
-      waitNavigation: false,
-      watchPopup: true,
-    },
-    { type: 'manual', message: '请完成 OAuth 授权', match: '', timeoutMs: 180000 },
-    { type: 'waitForUrl', match: '', timeoutMs: 60000 },
-  ];
+  return [];
 }
 
 /** 默认验证技能：将页面交给用户处理，完成条件可在技能检测规则中配置。 */
@@ -413,7 +421,9 @@ export function createProcedure(partial: Partial<Procedure> = {}): Procedure {
             loggedInSelector: '',
             loggedInUrlIncludes: '',
             loginUrlPattern: '',
-            notLoggedInKeywords: ['请登录', '登录后操作', '您需要登录'],
+            // 关键词必须由目标网站显式配置；通用“请登录”很容易出现在
+            // 导航、帮助或页脚中，不能作为所有站点的默认掉线信号。
+            notLoggedInKeywords: [],
           }
         : kind === 'verification'
           ? {

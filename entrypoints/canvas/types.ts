@@ -1,4 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { FlowEdgeWhen } from '../../src/lib/models.js';
+import type { FlowNodeReport, FlowTestReport, PageObservation } from '../../src/lib/types.js';
+export type { FlowErrorType, FlowNodeReport, FlowTestReport } from '../../src/lib/types.js';
 
 export type FlowNodeKind =
   | 'start'
@@ -9,15 +12,15 @@ export type FlowNodeKind =
   | 'delay'
   | 'variable'
   | 'log'
-  | 'extract'
   | 'request'
   /** 兼容早期未发布的实验性节点数据。新建节点统一使用 request。 */
   | 'http'
   | 'procedure'
   | 'site';
 
-export type EdgeWhen = 'always' | 'true' | 'false';
-export type RunMark = 'idle' | 'running' | 'done' | 'failed';
+/** 与持久化 Flow 模型共用边条件，避免画布和后台出现分叉定义。 */
+export type EdgeWhen = FlowEdgeWhen;
+export type RunMark = 'idle' | 'running' | 'done' | 'failed' | 'timeout' | 'need_login' | 'skipped' | 'aborted';
 export type LogLevel = 'info' | 'warn' | 'error' | 'success';
 
 export interface FlowNodeData extends Record<string, unknown> {
@@ -37,15 +40,18 @@ export interface FlowNodeData extends Record<string, unknown> {
   params?: Record<string, unknown>;
   /** 技能有返回值时，可将完整结果写入此变量；留空则合并命名结果。 */
   resultVariable?: string;
-  selector?: string;
-  mode?: 'text' | 'attribute' | 'html' | 'list' | 'table';
-  attribute?: string;
-  multiple?: boolean;
   variable?: string;
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | string;
   headers?: string;
   body?: string;
   timeoutMs?: number | string;
+  /** 节点自身的总超时，不影响请求或技能内部步骤超时。 */
+  nodeTimeoutMs?: number | string;
+  retryCount?: number | string;
+  retryDelayMs?: number | string;
+  /** 默认 true：失败后继续执行后续节点。 */
+  continueOnError?: boolean;
+  lastReport?: FlowNodeReport;
   force?: boolean;
   runMark?: RunMark;
 }
@@ -83,6 +89,13 @@ export interface StoredFlow {
   variables: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
+  siteSync?: {
+    mode: 'manual' | 'all-sites';
+    includeDisabled: boolean;
+    includeMissingSiteId: boolean;
+    includeLoginProcedures: boolean;
+    autoSync: boolean;
+  };
 }
 
 export interface ProcedureStep {
@@ -107,6 +120,7 @@ export interface Site {
   url: string;
   checkinProcedureId?: string;
   verificationProcedureId?: string | null;
+  enabled: boolean;
 }
 
 export interface FlowListResponse {
@@ -142,20 +156,13 @@ export interface RunResponse {
   outputs?: Record<string, unknown>;
   returnValue?: unknown;
   tabId?: number | null;
+  observations?: PageObservation[];
+  failedStepIndex?: number;
+  failedStepType?: string;
+  executionId?: string;
 }
 
-/** EXTRACT_PAGE_DATA 的后台响应，保留 value/result 兼容不同执行器实现。 */
-export interface ExtractPageDataResponse {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  data?: unknown;
-  value?: unknown;
-  result?: unknown;
-  count?: number;
-  tabId?: number;
-  pageUrl?: string;
-}
+export type CanvasFlowTestReport = FlowTestReport;
 
 /** HTTP_REQUEST 的后台响应。body 可能是文本，也可能是已解析 JSON。 */
 export interface HttpRequestResponse {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Menu, Settings2 } from 'lucide-react';
+import { BrainCircuit, Bot, Menu, Settings2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -37,8 +37,10 @@ interface AiChatPanelProps {
   settings: Settings;
   runtime: RuntimeState;
   notify: (text: string, error?: boolean) => void;
+  onThinkingModeChange: (enabled: boolean) => void;
   onOpenSettings: () => void;
   onOpenEntity: (entity: TouchedEntity) => void;
+  onClose?: () => void;
 }
 
 async function request<T>(message: object): Promise<ServiceResponse<T>> {
@@ -52,7 +54,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error || '未知错误');
 }
 
-export function AiChatPanel({ settings, runtime, notify, onOpenSettings, onOpenEntity }: AiChatPanelProps) {
+export function AiChatPanel({ settings, runtime, notify, onThinkingModeChange, onOpenSettings, onOpenEntity, onClose }: AiChatPanelProps) {
   const [sessions, setSessions] = useState<AgentChatSessionSummary[]>([]);
   const [session, setSession] = useState<AgentChatSessionRecord | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -226,6 +228,9 @@ export function AiChatPanel({ settings, runtime, notify, onOpenSettings, onOpenE
   const displayedPending = pendingMessage?.sessionId === activeSessionId ? pendingMessage.turn : null;
   const turns = session?.turns || [];
   const title = session?.title || '新对话';
+  const activeProgress = isCurrentBusy && runtime.agentProgress?.sessionId === activeSessionId
+    ? runtime.agentProgress
+    : null;
   const sessionStatus = useMemo(() => {
     if (isCurrentBusy) return { label: aborting ? '正在停止' : '处理中', variant: 'warning' as const };
     if (session?.status === 'interrupted') return { label: '已中断', variant: 'destructive' as const };
@@ -253,13 +258,17 @@ export function AiChatPanel({ settings, runtime, notify, onOpenSettings, onOpenE
           <span className="ai-chat-header-icon"><Bot aria-hidden="true" /></span>
           <div className="ai-chat-header-copy"><strong>{title}</strong><span>{settings.llmProvider === 'anthropic' ? 'Anthropic' : 'OpenAI 兼容'} · {settings.llmModel || '未选择模型'}</span></div>
           <Badge variant={sessionStatus.variant}>{sessionStatus.label}</Badge>
+          <Tooltip><TooltipTrigger asChild><Button className={`ai-chat-thinking-toggle${settings.agentThinkingMode ? ' active' : ''}`} variant={settings.agentThinkingMode ? 'secondary' : 'ghost'} size="sm" disabled={isCurrentBusy} onClick={() => onThinkingModeChange(!settings.agentThinkingMode)} aria-pressed={settings.agentThinkingMode} aria-label={settings.agentThinkingMode ? '关闭 AI 思考模式' : '开启 AI 思考模式'}><BrainCircuit aria-hidden="true" /><span>{settings.agentThinkingMode ? '思考' : '快速'}</span></Button></TooltipTrigger><TooltipContent>{isCurrentBusy ? '当前对话结束后可切换模式' : settings.agentThinkingMode ? '已开启：显示可折叠的决策摘要' : '快速模式：隐藏决策摘要'}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onOpenSettings} aria-label="打开 AI 设置"><Settings2 aria-hidden="true" /></Button></TooltipTrigger><TooltipContent>AI 设置</TooltipContent></Tooltip>
+          {onClose ? <Tooltip><TooltipTrigger asChild><Button data-floating-ai-close variant="ghost" size="icon" onClick={onClose} aria-label="关闭浮动 AI 对话"><X aria-hidden="true" /></Button></TooltipTrigger><TooltipContent>收起 AI 对话</TooltipContent></Tooltip> : null}
         </header>
         <ConversationTranscript
           turns={turns}
           pendingTurn={displayedPending}
           busy={isCurrentBusy}
-          progress={isCurrentBusy && runtime.agentProgress?.sessionId === activeSessionId ? runtime.agentProgress.message : ''}
+          progress={activeProgress?.message || ''}
+          thinkingEnabled={activeProgress?.thinkingEnabled ?? settings.agentThinkingMode}
+          thinking={activeProgress?.thinking || []}
           error={error}
           apiConfigured={Boolean(settings.llmApiKey)}
           onUsePrompt={setDraft}

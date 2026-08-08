@@ -136,20 +136,28 @@ export function samplePageState(): PageState {
       );
     })
     .slice(0, 40)
-    .map((el) => ({
-      tag: el.tagName.toLowerCase(),
-      type: (el.getAttribute && el.getAttribute('type')) || '',
-      text: (
-        el.innerText ||
-        (el as HTMLInputElement).value ||
-        el.getAttribute('placeholder') ||
-        el.getAttribute('aria-label') ||
-        ''
-      )
-        .trim()
-        .slice(0, 60),
-      selector: stableSelector(el),
-    }))
+    .map((el) => {
+      const type = (el.getAttribute && el.getAttribute('type')) || '';
+      // 密码字段的 value 绝不能进入页面快照：快照会被探索器和 AI 对话回灌。
+      // 只保留字段类型这一条非敏感事实，普通登录仍可据此判断并触发提交。
+      const text = type.toLowerCase() === 'password'
+        ? '[密码字段]'
+        : (
+            el.innerText ||
+            (el as HTMLInputElement).value ||
+            el.getAttribute('placeholder') ||
+            el.getAttribute('aria-label') ||
+            ''
+          )
+            .trim()
+            .slice(0, 60);
+      return {
+        tag: el.tagName.toLowerCase(),
+        type,
+        text,
+        selector: stableSelector(el),
+      };
+    })
     .filter((e) => e.selector);
 
   return {

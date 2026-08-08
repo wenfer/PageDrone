@@ -18,7 +18,7 @@ import { RUN_STATE } from './messaging.js';
 import { CancellationToken } from './cancellation.js';
 import { RunContext, type RunTarget } from './run-context.js';
 import { setQueueRunningHook, abortPendingIntervention } from './run-context.js';
-import { updateBadgeFromLogs, notifySummary } from './scheduler.js';
+import { notifySummary } from './scheduler.js';
 import { isFatal } from './errors.js';
 import type {
   Site,
@@ -80,9 +80,6 @@ export class ExecutionQueue {
       queue: [],
       message: reason,
     });
-    // drain 的 finally 因 myToken !== drainToken 会整块跳过（含徽标刷新），
-    // 所以停止路径必须自己更新徽标，否则工具栏红点停留在旧状态。
-    await updateBadgeFromLogs();
     return { stopped: true, reason };
   }
 
@@ -234,7 +231,6 @@ export class ExecutionQueue {
           this.currentTaskId = null;
         }
 
-        await updateBadgeFromLogs();
         if (!wasAbort) await notifySummary(results, settings);
       }
     }

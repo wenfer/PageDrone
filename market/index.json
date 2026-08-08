@@ -1,6 +1,7 @@
 {
   "spec": "auto-checkin-market/1",
-  "updated": "2026-08-03T00:00:00Z",
+  "version": 1,
+  "updated": "2026-08-07T00:00:00Z",
   "items": [
     {
       "marketId": "example-discuz-checkin",
@@ -10,7 +11,8 @@
       "author": "auto-checkin",
       "version": "1.0.0",
       "homepage": "https://github.com/wenfer/auto-checkin-procedures",
-      "updatedAt": "2026-08-03T00:00:00Z"
+      "download": "procedures/example-discuz-checkin.json",
+      "updatedAt": "2026-08-07T00:00:00Z"
     },
     {
       "marketId": "example/generic-login",
@@ -20,7 +22,8 @@
       "author": "auto-checkin",
       "version": "1.0.0",
       "homepage": "https://github.com/wenfer/auto-checkin-procedures",
-      "updatedAt": "2026-08-03T00:00:00Z"
+      "download": "procedures/example-generic-login.json",
+      "updatedAt": "2026-08-07T00:00:00Z"
     }
   ]
 }

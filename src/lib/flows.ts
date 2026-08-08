@@ -13,16 +13,32 @@ const STORAGE_KEY = 'flows';
 
 export function createFlow(partial: Partial<Flow> = {}): Flow {
   const now = Date.now();
+  const hasCustomNodes = Array.isArray(partial.nodes) && partial.nodes.length > 0;
+  let nodes: Flow['nodes'];
+  let edges: Flow['edges'];
+  if (hasCustomNodes) {
+    nodes = partial.nodes!;
+    edges = partial.edges ?? [];
+  } else {
+    const startId = uid('node');
+    const endId = uid('node');
+    nodes = [
+      { id: startId, type: 'start', x: 80, y: 200, data: {} },
+      { id: endId, type: 'end', x: 500, y: 200, data: {} },
+    ];
+    edges = [{ id: uid('edge'), from: startId, to: endId, when: 'always' }];
+  }
   return {
     id: uid('flow'),
     name: '新流程',
     description: '',
-    nodes: [],
-    edges: [],
     variables: {},
     createdAt: now,
     updatedAt: now,
     ...partial,
+    // 不传入 nodes/edges 时必须得到可直接运行的开始 → 结束骨架。
+    nodes,
+    edges,
   };
 }
 
@@ -36,10 +52,19 @@ async function writeAll(list: Flow[]): Promise<void> {
 }
 
 export async function getFlows(): Promise<Flow[]> {
-  return readAll();
+  const list = await readAll();
+  let changed = false;
+  const normalized = list.map((flow) => {
+    const next = ensureDefaultGraph(flow);
+    if (next !== flow) changed = true;
+    return next;
+  });
+  if (changed) await writeAll(normalized);
+  return normalized;
 }
 
 export async function saveFlow(flow: Flow): Promise<Flow> {
+  flow = ensureDefaultGraph(flow);
   const list = await readAll();
   const idx = list.findIndex((f) => f.id === flow.id);
   flow.updatedAt = Date.now();
@@ -48,6 +73,13 @@ export async function saveFlow(flow: Flow): Promise<Flow> {
   else list.push(flow);
   await writeAll(list);
   return flow;
+}
+
+/** 修复早期由管理页创建、但尚未进入画布编辑的空流程。 */
+function ensureDefaultGraph(flow: Flow): Flow {
+  if (Array.isArray(flow.nodes) && flow.nodes.length > 0) return flow;
+  const scaffold = createFlow();
+  return { ...flow, nodes: scaffold.nodes, edges: scaffold.edges };
 }
 
 export async function deleteFlow(id: string): Promise<void> {
