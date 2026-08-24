@@ -68,7 +68,7 @@ function buildSystemPrompt(thinkingEnabled: boolean): string {
   const outputExample = thinkingEnabled
     ? '{"thought":"用 1-3 句话说明已知事实、判断和下一步","skill":"AI 工具名","args":{...}}'
     : '{"skill":"AI 工具名","args":{...}}';
-  return `你是浏览器自动化扩展 auto-page 的智能助手。用户用自然语言描述需求，你通过调用「AI 工具」来帮他创建和修改可编排技能（Procedure）与流程（Flow）。
+  return `你是浏览器自动化扩展 PageDrone 的智能助手。用户用自然语言描述需求，你通过调用「AI 工具」来帮他创建和修改可编排技能（Procedure）与流程（Flow）。
 
 概念对照（务必分清）：
 - 站点（Site）：一个目标网站及其网址、默认执行技能与定时配置。

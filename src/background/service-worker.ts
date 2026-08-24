@@ -29,6 +29,7 @@ import {
   deleteAgentSession,
 } from '../lib/agent-chat.js';
 import { LlmClient } from '../lib/llm.js';
+import { performHttpRequest } from '../lib/http-request.js';
 import {
   startRecording,
   stopRecording,
@@ -38,6 +39,16 @@ import {
   isRecording,
 } from '../lib/recorder.js';
 import { createProcedure } from '../lib/models.js';
+import {
+  MCP_KEEPALIVE_ALARM,
+  disconnectMcp,
+  initMcp,
+  mcpKeepalive,
+  reconnectMcp,
+} from '../lib/mcp/session.js';
+import { getMcpConfig, getMcpSessionState, updateMcpConfig } from '../lib/mcp/config.js';
+import { clearMcpAudit, getMcpAudit } from '../lib/mcp/audit.js';
+import { listPendingConfirms, resolveMcpConfirm } from '../lib/mcp/confirms.js';
 import type { MessageRequest, Settings, Step } from '../lib/types.js';
 
 /** handleMessage 的返回值统一被展开进 { ok: true, ... } 响应体 */
@@ -59,6 +70,8 @@ async function bootstrap(): Promise<void> {
   await chrome.action.setBadgeText({ text: '' });
   await setRuntime({ state: RUN_STATE.IDLE, message: '已就绪', queue: [] });
   await rescheduleAllAlarms();
+  // MCP 服务：恢复 keepalive 闹钟；总开关开启时重建出站 WS 连接
+  await initMcp().catch(() => undefined);
 }
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -78,6 +91,10 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === MCP_KEEPALIVE_ALARM) {
+    void mcpKeepalive();
+    return;
+  }
   void handleAlarm(alarm);
 });
 
@@ -112,93 +129,9 @@ function errText(err: unknown): string {
 /**
  * Execute an outbound request in the service worker. Keeping this here gives
  * flow nodes the same host-permission/CORS behaviour as the rest of the SW.
+ * Implementation lives in src/lib/http-request.ts so the MCP `http-request`
+ * tool shares exactly the same behaviour.
  */
-async function performHttpRequest(options: {
-  url: string;
-  method?: string;
-  headers?: Record<string, string> | string;
-  body?: unknown;
-  timeoutMs?: number;
-}): Promise<Record<string, unknown>> {
-  const url = String(options.url || '').trim();
-  if (!/^https?:\/\//i.test(url)) throw new Error('请求 URL 必须是 http(s) 地址');
-  const method = String(options.method || 'GET').toUpperCase();
-  const allowed = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
-  if (!allowed.has(method)) throw new Error(`不支持的请求方法：${method}`);
-
-  const timeoutMs = Math.min(120000, Math.max(1000, Number(options.timeoutMs) || 30000));
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const headers: Record<string, string> = {};
-    let rawHeaders: Record<string, string> = {};
-    if (typeof options.headers === 'string' && options.headers.trim()) {
-      try {
-        const parsed = JSON.parse(options.headers);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          rawHeaders = Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value ?? '')]));
-        }
-      } catch {
-        for (const line of options.headers.split(/\r?\n/)) {
-          const index = line.indexOf(':');
-          if (index > 0) rawHeaders[line.slice(0, index).trim()] = line.slice(index + 1).trim();
-        }
-      }
-    } else if (options.headers && typeof options.headers === 'object') {
-      rawHeaders = options.headers;
-    }
-    for (const [key, value] of Object.entries(rawHeaders)) {
-      const name = String(key || '').trim();
-      if (!name) continue;
-      headers[name] = String(value ?? '');
-    }
-
-    let body: BodyInit | undefined;
-    if (method !== 'GET' && method !== 'HEAD' && options.body !== undefined && options.body !== null) {
-      if (typeof options.body === 'string') {
-        body = options.body;
-      } else {
-        body = JSON.stringify(options.body);
-        if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
-          headers['Content-Type'] = 'application/json';
-        }
-      }
-    }
-
-    const response = await fetch(url, {
-      method,
-      headers,
-      body,
-      credentials: 'omit',
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    const raw = await response.text();
-    const contentType = response.headers.get('content-type') || '';
-    let data: unknown = raw;
-    if (/json/i.test(contentType) && raw.trim()) {
-      try { data = JSON.parse(raw); } catch { /* keep raw response */ }
-    }
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => { responseHeaders[key] = value; });
-    return {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-      data,
-      url: response.url || url,
-      message: response.ok ? `请求成功（${response.status}）` : `请求失败（HTTP ${response.status}）`,
-    };
-  } catch (error) {
-    if ((error as DOMException)?.name === 'AbortError') {
-      throw new Error(`请求超时（${timeoutMs}ms）`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const msg = (message ?? {}) as MessageRequest;
@@ -584,6 +517,39 @@ async function handleMessage(message: MessageRequest): Promise<MessageResult> {
         recordingResult: null,
       });
       return r;
+    }
+
+    // —— MCP 服务（设置页管理面）——
+    case MSG.MCP_GET_STATE: {
+      const [config, session, pendingConfirms, audits] = await Promise.all([
+        getMcpConfig(),
+        getMcpSessionState(),
+        Promise.resolve(listPendingConfirms()),
+        getMcpAudit(100),
+      ]);
+      return { config, session, pendingConfirms, audits };
+    }
+    case MSG.MCP_SET_CONFIG: {
+      const config = await updateMcpConfig(message);
+      if (!config.enabled) {
+        await disconnectMcp('MCP 服务已关闭');
+      } else if (message.action === 'reconnect') {
+        await reconnectMcp();
+      } else {
+        // 开关刚打开 / 地址或令牌变化：立即尝试连接（失败会自动退避重连）
+        await initMcp();
+      }
+      const session = await getMcpSessionState();
+      return { config, session };
+    }
+    case MSG.MCP_RESOLVE_CONFIRM: {
+      if (!message.confirmId) throw new Error('缺少 confirmId');
+      const resolved = await resolveMcpConfirm(message.confirmId, message.approve !== false, message.remember === true);
+      return { resolved, remaining: listPendingConfirms() };
+    }
+    case MSG.MCP_CLEAR_AUDIT: {
+      await clearMcpAudit();
+      return { cleared: true };
     }
 
     default: {

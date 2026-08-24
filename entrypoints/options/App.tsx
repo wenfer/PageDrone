@@ -12,6 +12,7 @@ import {
   FileJson2,
   Globe2,
   ListChecks,
+  Plug,
   SearchX,
   ScrollText,
   Settings2,
@@ -51,8 +52,9 @@ import { exportAll, importSites } from '../../src/lib/storage.js';
 import { compareVersions, type MarketItem } from '../../src/lib/market.js';
 import type { ChatTurn, ExploreProgressEvent, InterventionContext, RecordingPreview, RuntimeState } from '../../src/lib/types.js';
 import { AiChatPanel } from './components/ai-chat/AiChatPanel';
+import { McpPanel } from './components/McpPanel';
 
-type Tab = 'overview' | 'sites' | 'procedures' | 'market' | 'flows' | 'logs' | 'agent' | 'data' | 'settings';
+type Tab = 'overview' | 'sites' | 'procedures' | 'market' | 'flows' | 'logs' | 'agent' | 'data' | 'mcp' | 'settings';
 
 type ServiceResponse<T = Record<string, unknown>> = T & { ok: boolean; error?: string };
 type StatusPayload = {
@@ -75,6 +77,7 @@ const NAV: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
   { id: 'flows', label: '流程', hint: '画布编排', icon: Workflow },
   { id: 'logs', label: '日志', hint: '执行记录', icon: ScrollText },
   { id: 'agent', label: 'AI 对话', hint: '自然语言操作', icon: Bot },
+  { id: 'mcp', label: 'MCP 服务', hint: '外部 agent 接入', icon: Plug },
   { id: 'data', label: '导入 / 导出', hint: '备份与迁移', icon: DatabaseBackup },
   { id: 'settings', label: '设置', hint: '全局与 AI', icon: Settings2 },
 ];
@@ -265,7 +268,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">a</span><span><strong>auto-page</strong><small>网页 RPA 工作台</small></span></div>
+        <div className="brand"><span className="brand-mark">P</span><span><strong>PageDrone</strong><small>浏览器自动化工作台</small></span></div>
         <nav aria-label="主导航">
           {NAV.map((item) => (
             <button key={item.id} type="button" className={tab === item.id ? 'nav-button active' : 'nav-button'} onClick={() => setTab(item.id)}>
@@ -297,6 +300,7 @@ export default function App() {
           {!state.loading && tab === 'flows' ? <FlowsPanel flows={state.flows} notify={notify} /> : null}
           {!state.loading && tab === 'logs' ? <LogsPanel logs={state.logs} tasks={state.tasks} notify={notify} /> : null}
           {!state.loading && tab === 'agent' ? <AiChatPanel settings={state.settings} runtime={state.runtime} notify={notify} onThinkingModeChange={(enabled) => void updateAgentThinkingMode(enabled)} onOpenSettings={() => setTab('settings')} onOpenEntity={openAiEntity} /> : null}
+          {!state.loading && tab === 'mcp' ? <McpPanel notify={notify} /> : null}
           {!state.loading && tab === 'data' ? <DataTransferPanel notify={notify} /> : null}
           {!state.loading && tab === 'settings' ? <SettingsPanel settings={state.settings} applySettings={state.applySettings} notify={notify} /> : null}
         </div>
@@ -854,7 +858,7 @@ function DataTransferPanel({ notify }: { notify: (text: string, error?: boolean)
     try {
       const raw = JSON.parse(await file.text()) as unknown;
       if (!Array.isArray(raw) && (!raw || typeof raw !== 'object' || !Array.isArray((raw as { sites?: unknown }).sites))) {
-        throw new Error('文件中缺少 sites 数组，不是有效的 auto-page 备份');
+        throw new Error('文件中缺少 sites 数组，不是有效的 PageDrone 备份');
       }
       const payload = raw as ImportPayload;
       const objectPayload = Array.isArray(payload) ? null : payload;
@@ -882,7 +886,7 @@ function DataTransferPanel({ notify }: { notify: (text: string, error?: boolean)
       const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `auto-page-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `pagedrone-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.append(link);
       link.click();
       link.remove();

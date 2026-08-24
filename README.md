@@ -1,6 +1,6 @@
-# auto-page - 网页 RPA 工具
+# PageDrone - 浏览器自动化工具
 
-网页版 RPA 工具，支持**画布流程编排**、**可复用技能库**、通用浏览器自动化操作、条件分支、循环、变量等。
+浏览器自动化工具，支持**画布流程编排**、**可复用技能库**、通用浏览器自动化操作、条件分支、循环、变量等。
 
 为各类网站配置 **DOM 模拟执行**，支持：
 
@@ -24,7 +24,7 @@
 2. 打开 Chrome，访问 `chrome://extensions`
 3. 开启右上角 **开发者模式**
 4. 点击 **加载已解压的扩展程序**
-5. 选择 WXT 构建产物目录：`auto-checkin/.output/chrome-mv3`
+5. 选择 WXT 构建产物目录：`<项目目录>/.output/chrome-mv3`
 
 ## 快速开始
 
@@ -202,7 +202,7 @@ return { ok, message: ok ? '执行完成' : '已点击，请人工确认' };
 项目由 WXT 统一构建，React 负责管理页，React Flow 负责流程画布；后台领域逻辑继续放在 `src/`。可加载产物位于 `.output/chrome-mv3/`。
 
 ```
-auto-checkin/
+auto-checkin/                       # 仓库目录名保持不变（品牌名为 PageDrone）
 ├── wxt.config.ts                    # MV3 清单、权限与 WXT 配置
 ├── components.json                  # shadcn/ui 组件生成配置
 ├── assets/globals.css               # Tailwind v4 与统一明暗主题令牌
@@ -294,5 +294,5 @@ git push origin v1.0.3
 
 ```bash
 bash scripts/pack.sh
-# 生成 releases/auto-checkin-v<version>.zip
+# 生成 releases/pagedrone-v<version>.zip
 ```

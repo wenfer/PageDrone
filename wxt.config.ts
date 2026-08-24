@@ -14,8 +14,8 @@ export default defineConfig({
   }),
   manifestVersion: 3,
   manifest: {
-    name: 'auto-page - 网页 RPA',
-    description: '网页版 RPA 工具 - 画布编排任务与流程，支持条件/循环/并行与通用浏览器自动化。',
+    name: 'PageDrone',
+    description: '浏览器自动化工具 - 画布编排任务与流程，支持条件/循环/并行与通用浏览器自动化。',
     permissions: [
       'storage',
       'alarms',

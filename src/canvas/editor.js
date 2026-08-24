@@ -1,5 +1,5 @@
 /**
- * auto-page 流程画布编辑器
+ * PageDrone 流程画布编辑器
  *
  * 节点类型：
  *   start / end / condition / loop / parallel / delay / variable / log / procedure / site

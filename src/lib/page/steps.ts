@@ -222,7 +222,7 @@ export async function pageSubmitAutofilledLogin(): Promise<AutofilledLoginResult
   });
   if (!submit) {
     if (form && typeof form.requestSubmit === 'function') {
-      if (form.getAttribute('data-auto-page-login-submitted') === 'true') {
+      if (form.getAttribute('data-pagedrone-login-submitted') === 'true') {
         return {
           hasPasswordField: true,
           credentialsReady: true,
@@ -230,7 +230,7 @@ export async function pageSubmitAutofilledLogin(): Promise<AutofilledLoginResult
           message: '登录表单已提交，等待页面响应',
         };
       }
-      form.setAttribute('data-auto-page-login-submitted', 'true');
+      form.setAttribute('data-pagedrone-login-submitted', 'true');
       form.requestSubmit();
       return {
         hasPasswordField: true,
@@ -247,7 +247,7 @@ export async function pageSubmitAutofilledLogin(): Promise<AutofilledLoginResult
     };
   }
 
-  if (submit.getAttribute('data-auto-page-login-submitted') === 'true') {
+  if (submit.getAttribute('data-pagedrone-login-submitted') === 'true') {
     return {
       hasPasswordField: true,
       credentialsReady: true,
@@ -258,7 +258,7 @@ export async function pageSubmitAutofilledLogin(): Promise<AutofilledLoginResult
 
   submit.scrollIntoView({ block: 'center', inline: 'center' });
   submit.focus?.();
-  submit.setAttribute('data-auto-page-login-submitted', 'true');
+  submit.setAttribute('data-pagedrone-login-submitted', 'true');
   submit.click();
   return {
     hasPasswordField: true,

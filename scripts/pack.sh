@@ -23,7 +23,7 @@ EXTENSION_DIR=".output/chrome-mv3"
 
 # —— 2. 版本与路径 ——
 VERSION=$(python3 -c "import json; print(json.load(open('$EXTENSION_DIR/manifest.json'))['version'])")
-NAME="auto-checkin-v${VERSION}"
+NAME="pagedrone-v${VERSION}"
 OUT_DIR="releases"
 STAGE="$OUT_DIR/$NAME"
 ZIP_NAME="${NAME}.zip"

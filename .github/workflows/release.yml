@@ -86,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          NAME="auto-checkin-v${VERSION}"
+          NAME="pagedrone-v${VERSION}"
           # WXT 的 Chrome MV3 可加载产物固定在 .output/chrome-mv3/。
           STAGE="stage/${NAME}"
           mkdir -p stage
@@ -187,7 +187,7 @@ jobs:
           <?xml version='1.0' encoding='UTF-8'?>
           <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
             <app appid='${EXT_ID}'>
-              <updatecheck codebase='https://github.com/${{ github.repository }}/releases/download/v${VERSION}/auto-checkin-v${VERSION}.crx' version='${VERSION}' />
+              <updatecheck codebase='https://github.com/${{ github.repository }}/releases/download/v${VERSION}/pagedrone-v${VERSION}.crx' version='${VERSION}' />
             </app>
           </gupdate>
           XML
@@ -208,12 +208,12 @@ jobs:
             ## 自动签到助手 ${{ steps.ver.outputs.tag }}
 
             ### 安装（ZIP，推荐 Chrome 开发者模式）
-            1. 下载 `auto-checkin-v${{ steps.ver.outputs.version }}.zip` 并解压
+            1. 下载 `pagedrone-v${{ steps.ver.outputs.version }}.zip` 并解压
             2. Chrome 打开 `chrome://extensions`
             3. 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压目录
 
             ### CRX（签名包）
-            - `auto-checkin-v${{ steps.ver.outputs.version }}.crx`
+            - `pagedrone-v${{ steps.ver.outputs.version }}.crx`
             - 扩展 ID：`${{ steps.crx.outputs.ext_id }}`
             - `update.xml`：自托管自动更新清单（可用于企业策略分发）
 

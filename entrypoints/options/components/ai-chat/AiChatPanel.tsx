@@ -79,8 +79,8 @@ export function AiChatPanel({ settings, runtime, notify, onThinkingModeChange, o
       setBusySessionId(response.busySessionId || null);
       const loadedId = response.session?.id || null;
       setActiveSessionId(loadedId);
-      if (loadedId) sessionStorage.setItem('auto-page/active-ai-chat', loadedId);
-      else sessionStorage.removeItem('auto-page/active-ai-chat');
+      if (loadedId) sessionStorage.setItem('pagedrone/active-ai-chat', loadedId);
+      else sessionStorage.removeItem('pagedrone/active-ai-chat');
       setPendingMessage((pending) => {
         if (!pending || pending.sessionId !== loadedId) return pending;
         const accepted = response.session?.turns.some((turn) => turn.role === 'user' && turn.text === pending.turn.text && Math.abs(turn.at - pending.turn.at) < 30_000);
@@ -104,7 +104,7 @@ export function AiChatPanel({ settings, runtime, notify, onThinkingModeChange, o
   }, []);
 
   useEffect(() => {
-    const remembered = sessionStorage.getItem('auto-page/active-ai-chat') || undefined;
+    const remembered = sessionStorage.getItem('pagedrone/active-ai-chat') || undefined;
     void loadHistory(remembered);
   }, [loadHistory]);
 
@@ -138,7 +138,7 @@ export function AiChatPanel({ settings, runtime, notify, onThinkingModeChange, o
       setSession(response.session);
       setActiveSessionId(response.session.id);
       setPendingMessage(null);
-      sessionStorage.setItem('auto-page/active-ai-chat', response.session.id);
+      sessionStorage.setItem('pagedrone/active-ai-chat', response.session.id);
       await loadHistory(response.session.id, true);
       setMobileSessionsOpen(false);
       return response.session;

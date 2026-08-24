@@ -1078,7 +1078,7 @@ async function onExport() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `auto-checkin-export-${dateStamp()}.json`;
+  a.download = `pagedrone-export-${dateStamp()}.json`;
   a.click();
   URL.revokeObjectURL(url);
   $('#ioMsg').textContent = '导出完成';

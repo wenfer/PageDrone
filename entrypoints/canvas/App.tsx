@@ -715,7 +715,7 @@ export default function App() {
     <CanvasResourcesContext.Provider value={{ procedures, sites }}>
       <div className="canvas-app" onClick={() => setContextMenu(null)}>
         <aside className="sidebar">
-          <header><strong>auto-page</strong><span>React Flow 画布编排</span></header>
+          <header><strong>PageDrone</strong><span>React Flow 画布编排</span></header>
           <Palette title="控制节点" items={NODE_CATALOG.filter((item) => item.group === 'control')} />
           <Palette title="浏览器节点" items={NODE_CATALOG.filter((item) => item.group === 'browser')} />
           <section className="sidebar-section grow">

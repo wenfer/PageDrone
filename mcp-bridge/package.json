@@ -1,0 +1,17 @@
+{
+  "name": "pagedrone-mcp",
+  "version": "0.1.0",
+  "description": "PageDrone 扩展的本地 MCP 桥接进程：stdio MCP server ⇄ WebSocket（连接 Chrome MV3 扩展）",
+  "license": "MIT",
+  "bin": {
+    "pagedrone-mcp": "./index.js"
+  },
+  "type": "commonjs",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

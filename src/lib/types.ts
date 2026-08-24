@@ -10,6 +10,11 @@ import type {
   RunStatus,
   SiteRunResult,
 } from './models.js';
+import type { McpConfig, McpSessionState } from './mcp/config.js';
+import type { McpAuditEntry } from './mcp/audit.js';
+import type { McpPendingConfirm } from './mcp/confirms.js';
+
+export type { McpConfig, McpSessionState, McpAuditEntry, McpPendingConfirm };
 
 /** 运行时状态（setRuntime 增量合并；含探索/录制/介入等临时字段） */
 export interface RuntimeState {
@@ -349,6 +354,16 @@ export interface MessageRequestMap {
   [MSG.AGENT_CHAT_DELETE]: { sessionId: string };
   // 前端（options.js）发的是打平字段，不是嵌套 decision 对象
   [MSG.INTERVENTION_RESOLVE]: { token: string; action?: InterventionAction; patchStep?: Step | null };
+  // —— MCP 服务 ——
+  [MSG.MCP_GET_STATE]: Record<string, never>;
+  [MSG.MCP_SET_CONFIG]: Partial<Omit<McpConfig, 'token'>> & {
+    /** 轮换配对令牌 */
+    rotateToken?: boolean;
+    /** 配置保存后的连接动作 */
+    action?: 'reconnect' | 'disconnect';
+  };
+  [MSG.MCP_RESOLVE_CONFIRM]: { confirmId: string; approve: boolean; remember: boolean };
+  [MSG.MCP_CLEAR_AUDIT]: Record<string, never>;
   [MSG.RECORD_START]: { url: string };
   [MSG.RECORD_STOP]: { siteId: string; url?: string; name?: string; successKws?: string[] };
   [MSG.RECORD_EVENT]: { event: RecordingEvent };
