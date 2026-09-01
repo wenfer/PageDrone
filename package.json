@@ -1,6 +1,6 @@
 {
   "name": "pagedrone",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "PageDrone - 浏览器自动化工具，画布编排任务与流程",
   "type": "module",

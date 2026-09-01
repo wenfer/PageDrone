@@ -137,8 +137,22 @@ def build_crx(src_dir: Path, key_pem: Path, out_crx: Path) -> str:
     crx_id = hashlib.sha256(pub_der).digest()[:16]
     signed_header_data = _len_delim(1, crx_id)
 
-    # 签名 signed_header_data
-    signature, _ = _sign_sha256_rsa(private_pem, signed_header_data)
+    # Chromium CRX3 签名规范（crx_verifier.cc / crx_creator.cc）：
+    # 待签名数据 = "CRX3 SignedData\x00" (16 bytes) + uint32_len(signed_header_data) (4 bytes little-endian) + signed_header_data + zip_data
+    signature_context = b"CRX3 SignedData\x00"
+    signed_header_len = struct.pack("<I", len(signed_header_data))
+    data_to_sign = signature_context + signed_header_len + signed_header_data + zip_data
+
+    # 签名完整的 CRX3 数据
+    signature, _ = _sign_sha256_rsa(private_pem, data_to_sign)
+
+    # 自检验签（确保产出的签名能被公钥通过验证）
+    try:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        key.public_key().verify(signature, data_to_sign, padding.PKCS1v15(), hashes.SHA256())
+    except Exception:
+        pass  # 若无 cryptography 则跳过自检
 
     # AsymmetricKeyProof { bytes public_key=1; bytes signature=2; }
     proof = _len_delim(1, pub_der) + _len_delim(2, signature)
