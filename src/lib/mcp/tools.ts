@@ -47,6 +47,21 @@ import {
   mcpExtract,
   mcpNavigate,
   mcpReadPage,
+  mcpScreenshot,
+  mcpGetPageOutline,
+  mcpHover,
+  mcpClearInput,
+  mcpPressKey,
+  mcpScrollPage,
+  mcpSelectOption,
+  mcpClickCoordinate,
+  mcpBatchActions,
+  mcpListTabs,
+  mcpSwitchTab,
+  mcpNewTab,
+  mcpGoBack,
+  mcpGoForward,
+  mcpReloadPage,
   mcpWait,
   mcpWaitForText,
   mcpWaitForUrl,
@@ -431,10 +446,13 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Re
         timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
       });
     case 'navigate': {
-      await assertBrowserDomainAllowed(String(args.url || ''));
+      const targetUrl = args.url ? String(args.url) : '';
+      if (targetUrl) {
+        await assertBrowserDomainAllowed(targetUrl);
+      }
       return mcpNavigate({
-        url: String(args.url || ''),
-        tabMode: args.tabMode === 'managed-reuse' ? 'managed-reuse' : 'managed-new',
+        url: targetUrl || undefined,
+        tabMode: args.tabMode === 'current-active' ? 'current-active' : args.tabMode === 'managed-reuse' ? 'managed-reuse' : 'managed-new',
       });
     }
     case 'read-page':
@@ -442,7 +460,18 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Re
         includeElements: args.includeElements !== false,
         textMaxLength: typeof args.textMaxLength === 'number' ? args.textMaxLength : undefined,
         elementLimit: typeof args.elementLimit === 'number' ? args.elementLimit : undefined,
+        inViewportOnly: args.inViewportOnly === true,
+        format: typeof args.format === 'string' ? (args.format as 'detailed' | 'compact' | 'elements_only') : undefined,
+        selectorScope: typeof args.selectorScope === 'string' ? args.selectorScope : undefined,
       });
+    case 'screenshot':
+      return mcpScreenshot({
+        selector: typeof args.selector === 'string' ? args.selector : undefined,
+        format: args.format === 'jpeg' ? 'jpeg' : 'png',
+        quality: typeof args.quality === 'number' ? args.quality : undefined,
+      });
+    case 'get-page-outline':
+      return mcpGetPageOutline();
     case 'click':
       return mcpClick({
         selector: String(args.selector || ''),
@@ -450,11 +479,54 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Re
         followPopup: args.followPopup === true,
         timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
       });
+    case 'hover':
+      return mcpHover({
+        selector: String(args.selector || ''),
+        timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
+      });
     case 'type':
       return mcpType({
         selector: String(args.selector || ''),
         text: String(args.text ?? ''),
         timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
+      });
+    case 'clear-input':
+      return mcpClearInput({
+        selector: String(args.selector || ''),
+      });
+    case 'press-key':
+      return mcpPressKey({
+        key: String(args.key || 'Enter'),
+        selector: typeof args.selector === 'string' ? args.selector : undefined,
+        modifiers: {
+          ctrl: !!args.ctrl,
+          alt: !!args.alt,
+          shift: !!args.shift,
+          meta: !!args.meta,
+        },
+      });
+    case 'scroll-page':
+      return mcpScrollPage({
+        direction: typeof args.direction === 'string' ? (args.direction as 'down') : undefined,
+        distance: typeof args.distance === 'number' ? args.distance : undefined,
+        selector: typeof args.selector === 'string' ? args.selector : undefined,
+      });
+    case 'select-option':
+      return mcpSelectOption({
+        selector: String(args.selector || ''),
+        value: typeof args.value === 'string' ? args.value : undefined,
+        label: typeof args.label === 'string' ? args.label : undefined,
+        index: typeof args.index === 'number' ? args.index : undefined,
+      });
+    case 'click-coordinate':
+      return mcpClickCoordinate({
+        x: Number(args.x) || 0,
+        y: Number(args.y) || 0,
+      });
+    case 'batch-actions':
+      return mcpBatchActions({
+        actions: Array.isArray(args.actions) ? (args.actions as Parameters<typeof mcpBatchActions>[0]['actions']) : [],
+        stopOnError: args.stopOnError !== false,
       });
     case 'wait':
       return mcpWait(Number(args.ms) || 0);
@@ -476,6 +548,20 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Re
         attribute: typeof args.attribute === 'string' ? args.attribute : undefined,
         multiple: args.multiple !== false,
       });
+    case 'list-tabs':
+      return mcpListTabs();
+    case 'switch-tab':
+      return mcpSwitchTab(Number(args.tabId));
+    case 'new-tab': {
+      await assertBrowserDomainAllowed(String(args.url || ''));
+      return mcpNewTab({ url: String(args.url || '') });
+    }
+    case 'go-back':
+      return mcpGoBack();
+    case 'go-forward':
+      return mcpGoForward();
+    case 'reload-page':
+      return mcpReloadPage({ ignoreCache: !!args.ignoreCache });
     case 'close-tab':
       return mcpCloseTab();
     case 'explore-and-create-procedure':

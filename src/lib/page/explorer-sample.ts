@@ -3,22 +3,70 @@
  * 自包含：stableSelector 定义在函数体内，供 chrome.scripting 序列化。
  */
 
+export interface PageElementRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PageElementPoint {
+  x: number;
+  y: number;
+}
+
 export interface PageElement {
+  index: number;
   tag: string;
   type: string;
+  role?: string;
   text: string;
   selector: string;
+  rect?: PageElementRect;
+  center?: PageElementPoint;
+  inViewport: boolean;
+  disabled?: boolean;
+  checked?: boolean;
+  value?: string;
+  placeholder?: string;
+  href?: string;
+}
+
+export interface PageViewportInfo {
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+  totalHeight: number;
+  totalWidth: number;
+}
+
+export interface PageSampleOptions {
+  includeElements?: boolean;
+  textMaxLength?: number;
+  elementLimit?: number;
+  inViewportOnly?: boolean;
+  format?: 'detailed' | 'compact' | 'elements_only';
+  selectorScope?: string;
 }
 
 export interface PageState {
   url: string;
   title: string;
   text: string;
+  viewport?: PageViewportInfo;
   elements: PageElement[];
+  compactView?: string;
   error?: string;
 }
 
-export function samplePageState(): PageState {
+export function samplePageState(options?: PageSampleOptions): PageState {
+  const opt: PageSampleOptions = options || {};
+  const textMaxLength = Math.min(30000, Math.max(100, Number(opt.textMaxLength) || 2000));
+  const elementLimit = Math.min(200, Math.max(1, Number(opt.elementLimit) || 50));
+  const inViewportOnly = opt.inViewportOnly === true;
+  const selectorScope = String(opt.selectorScope || '').trim();
+
   function stableSelector(el: Element): string {
     if (el.nodeType !== 1) return '';
     const htmlEl = el as HTMLElement;
@@ -66,9 +114,6 @@ export function samplePageState(): PageState {
       if (uniquelySelects(byClass, el)) return byClass;
     }
 
-    // 常见站点会给一组按钮复用完全相同的 class。逐级补充父节点和
-    // :nth-child，直到 selector 能且只能命中当前元素，避免执行时误点
-    // document.querySelector() 返回的第一个同类按钮。
     const path: string[] = [];
     let current: Element | null = el;
     while (current && current !== document.documentElement) {
@@ -114,56 +159,146 @@ export function samplePageState(): PageState {
     return path.join(' > ') || tag;
   }
 
-  const interactive = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'a, button, input, textarea, select, [role="button"], [onclick]'
-    )
-  )
+  let scopeRoot: Element | Document = document;
+  if (selectorScope) {
+    try {
+      const matched = document.querySelector(selectorScope);
+      if (matched) scopeRoot = matched;
+    } catch {
+      // 忽略非法选择器，默认全局
+    }
+  }
+
+  const vpWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+  const vpHeight = window.innerHeight || document.documentElement.clientHeight || 768;
+
+  const selectorList = 'a, button, input, textarea, select, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="switch"], [role="menuitem"], [onclick], [tabindex]:not([tabindex="-1"])';
+  const candidateElements = Array.from(scopeRoot.querySelectorAll<HTMLElement>(selectorList));
+
+  const sampledList = candidateElements
     .filter((el) => {
       const r = el.getBoundingClientRect();
       const style = window.getComputedStyle(el);
-      const disabled =
-        el.matches(':disabled') ||
-        el.getAttribute('aria-disabled') === 'true' ||
-        !!el.closest('[inert]');
-      return (
-        !disabled &&
+      
+      const isVisible =
         r.width > 0 &&
         r.height > 0 &&
         style.visibility !== 'hidden' &&
         style.display !== 'none' &&
-        style.pointerEvents !== 'none'
-      );
+        style.pointerEvents !== 'none';
+
+      if (!isVisible) return false;
+
+      if (inViewportOnly) {
+        const inView = r.top < vpHeight && r.bottom > 0 && r.left < vpWidth && r.right > 0;
+        if (!inView) return false;
+      }
+
+      return true;
     })
-    .slice(0, 40)
+    .slice(0, elementLimit);
+
+  let elemCounter = 1;
+  const elements: PageElement[] = opt.includeElements === false ? [] : sampledList
     .map((el) => {
+      const r = el.getBoundingClientRect();
+      const inViewport = r.top < vpHeight && r.bottom > 0 && r.left < vpWidth && r.right > 0;
       const type = (el.getAttribute && el.getAttribute('type')) || '';
-      // 密码字段的 value 绝不能进入页面快照：快照会被探索器和 AI 对话回灌。
-      // 只保留字段类型这一条非敏感事实，普通登录仍可据此判断并触发提交。
-      const text = type.toLowerCase() === 'password'
+      const isPassword = type.toLowerCase() === 'password';
+      const role = el.getAttribute('role') || undefined;
+      const placeholder = el.getAttribute('placeholder') || undefined;
+      const disabled = el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true';
+      const checked = (el as HTMLInputElement).checked || undefined;
+      const href = (el as HTMLAnchorElement).href || el.getAttribute('href') || undefined;
+
+      let value: string | undefined = undefined;
+      if (!isPassword) {
+        if ('value' in el && typeof (el as HTMLInputElement).value === 'string' && (el as HTMLInputElement).value) {
+          value = (el as HTMLInputElement).value.slice(0, 100);
+        }
+      } else {
+        value = '[密码字段]';
+      }
+
+      const rawText = isPassword
         ? '[密码字段]'
         : (
             el.innerText ||
-            (el as HTMLInputElement).value ||
-            el.getAttribute('placeholder') ||
             el.getAttribute('aria-label') ||
+            placeholder ||
+            value ||
+            el.getAttribute('title') ||
             ''
           )
             .trim()
-            .slice(0, 60);
-      return {
+            .slice(0, 80);
+
+      const selector = stableSelector(el);
+      if (!selector) return null;
+
+      const rect: PageElementRect = {
+        x: Math.round(r.left),
+        y: Math.round(r.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      };
+
+      const center: PageElementPoint = {
+        x: Math.round(r.left + r.width / 2),
+        y: Math.round(r.top + r.height / 2),
+      };
+
+      const item: PageElement = {
+        index: elemCounter++,
         tag: el.tagName.toLowerCase(),
         type,
-        text,
-        selector: stableSelector(el),
+        role,
+        text: rawText,
+        selector,
+        rect,
+        center,
+        inViewport,
+        disabled: disabled || undefined,
+        checked,
+        value,
+        placeholder,
+        href: href ? href.slice(0, 120) : undefined,
       };
+
+      return item;
     })
-    .filter((e) => e.selector);
+    .filter((e): e is PageElement => e != null);
+
+  const compactLines = elements.map((e) => {
+    const parts: string[] = [`[#${e.index}]`, `<${e.tag}${e.type ? ` type="${e.type}"` : ''}${e.role ? ` role="${e.role}"` : ''}>`];
+    if (e.text) parts.push(`"${e.text}"`);
+    if (e.value && e.value !== e.text) parts.push(`value="${e.value}"`);
+    if (e.checked) parts.push('[checked]');
+    if (e.disabled) parts.push('[disabled]');
+    if (e.inViewport && e.center) {
+      parts.push(`@(x:${e.center.x},y:${e.center.y}) [in-view]`);
+    } else if (e.center) {
+      parts.push(`@(x:${e.center.x},y:${e.center.y}) [scroll-needed]`);
+    }
+    parts.push(`-> ${e.selector}`);
+    return parts.join(' ');
+  });
+
+  const viewportInfo: PageViewportInfo = {
+    width: vpWidth,
+    height: vpHeight,
+    scrollX: Math.round(window.scrollX || window.pageXOffset || 0),
+    scrollY: Math.round(window.scrollY || window.pageYOffset || 0),
+    totalWidth: Math.round(document.documentElement.scrollWidth || vpWidth),
+    totalHeight: Math.round(document.documentElement.scrollHeight || vpHeight),
+  };
 
   return {
     url: location.href,
     title: document.title || '',
-    text: document.body ? document.body.innerText.slice(0, 1500) : '',
-    elements: interactive,
+    text: document.body ? document.body.innerText.slice(0, textMaxLength) : '',
+    viewport: viewportInfo,
+    elements,
+    compactView: compactLines.join('\n'),
   };
 }

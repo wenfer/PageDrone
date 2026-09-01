@@ -48,7 +48,7 @@ auto-checkin/                      # 仓库目录名保持不变（品牌名为 
 │   │   │   └── tools.ts · session.ts
 │   │   └── page/                 # chrome.scripting 注入的自包含函数
 │   │       ├── steps.ts · selectors.ts · collector.ts · user-script.ts
-│   │       └── explorer-sample.ts · explorer-exec.ts · extract.ts
+│   │       └── explorer-sample.ts · explorer-exec.ts · extract.ts · outline.ts
 │   ├── options/                  # 迁移对照用旧管理页，不进入 WXT 页面入口
 │   ├── canvas/                   # 迁移对照用旧画布，不进入 WXT 页面入口
 │   ├── styles/                   # 迁移对照用旧样式

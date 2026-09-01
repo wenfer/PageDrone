@@ -326,24 +326,42 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   {
     name: 'navigate',
     group: 'browser',
-    description: '打开或复用受管标签页跳转到指定 URL（硬拒绝浏览器内部页面）',
+    description: '打开、复用或接管受管标签页跳转到指定 URL（支持 managed-new/managed-reuse/current-active）',
     inputSchema: obj(
       {
-        url: str('目标网址 http(s)://'),
-        tabMode: { type: 'string', enum: ['managed-new', 'managed-reuse'], description: '默认 managed-new' },
+        url: str('目标网址 http(s)://；若使用 current-active 且不提供 url 则直接接管当前活跃标签页'),
+        tabMode: { type: 'string', enum: ['managed-new', 'managed-reuse', 'current-active'], description: '默认 managed-new' },
       },
-      ['url'],
     ),
   },
   {
     name: 'read-page',
     group: 'browser',
-    description: '读取受管标签页当前状态：URL/标题/正文摘要/可交互元素及已转义唯一选择器（密码框源头脱敏）',
+    description: '读取受管标签页当前状态：URL/标题/正文/可交互元素（含坐标、视口可见性、角色），支持 compact 极简文本树',
     inputSchema: obj({
       includeElements: bool('默认 true'),
-      textMaxLength: num('正文截断长度，默认 8000', 200, 20000),
-      elementLimit: num('元素数量上限，默认 40，最多 200', 1, 200),
+      textMaxLength: num('正文截断长度，默认 2000', 100, 30000),
+      elementLimit: num('元素数量上限，默认 50，最多 200', 1, 200),
+      inViewportOnly: bool('仅返回当前视口内的可见元素，默认 false'),
+      format: { type: 'string', enum: ['detailed', 'compact', 'elements_only'], description: '输出格式：detailed 详细全量，compact 极简文本树，elements_only 仅元素' },
+      selectorScope: str('限定采样区域的选择器（CSS/XPath）'),
     }),
+  },
+  {
+    name: 'screenshot',
+    group: 'browser',
+    description: '捕获受管标签页的可视区域截图，直接返回多模态大模型可识别的图像数据；可附带元素选择器获取其精准坐标',
+    inputSchema: obj({
+      selector: str('可选：高亮/定位的元素选择器'),
+      format: { type: 'string', enum: ['png', 'jpeg'], description: '图像格式，默认 png' },
+      quality: num('JPEG 质量 1-100，默认 80', 1, 100),
+    }),
+  },
+  {
+    name: 'get-page-outline',
+    group: 'browser',
+    description: '获取页面宏观大纲：标题层级结构（H1-H6）、表单及输入字段、主要导航链接、Meta 元数据',
+    inputSchema: obj({}),
   },
   {
     name: 'click',
@@ -360,12 +378,98 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
     ),
   },
   {
+    name: 'hover',
+    group: 'browser',
+    description: '鼠标悬停在指定元素上（触发 mouseover/mouseenter/pointerover/mousemove），用于展开下拉菜单或浮层提示',
+    inputSchema: obj(
+      {
+        selector: str('元素选择器'),
+        timeoutMs: num('等待元素超时，默认 10000', 1000, 120000),
+      },
+      ['selector'],
+    ),
+  },
+  {
     name: 'type',
     group: 'browser',
-    description: '向输入框写入文本并派发 input/change 事件',
+    description: '向输入框写入文本并派发 input/change 事件（密码字段禁止写入）',
     inputSchema: obj(
       { selector: str('输入框选择器'), text: str('要输入的文本'), timeoutMs: num('等待元素超时', 1000, 120000) },
       ['selector', 'text'],
+    ),
+  },
+  {
+    name: 'clear-input',
+    group: 'browser',
+    description: '清空输入框已有内容并派发 input/change 事件',
+    inputSchema: obj({ selector: str('输入框选择器') }, ['selector']),
+  },
+  {
+    name: 'press-key',
+    group: 'browser',
+    description: '派发键盘按键事件（如 Enter 提交、Tab 切换焦点、Escape 关闭浮层、Backspace、ArrowDown 等）',
+    inputSchema: obj(
+      {
+        key: str('按键名称，如 Enter, Tab, Escape, Backspace, ArrowDown, ArrowUp, Space 等'),
+        selector: str('可选：派发按键的目标元素，留空则发送给当前聚焦元素'),
+        ctrl: bool('是否同时按下 Ctrl 键'),
+        alt: bool('是否同时按下 Alt 键'),
+        shift: bool('是否同时按下 Shift 键'),
+        meta: bool('是否同时按下 Meta/Command 键'),
+      },
+      ['key'],
+    ),
+  },
+  {
+    name: 'scroll-page',
+    group: 'browser',
+    description: '滚动浏览页面或指定容器（支持上下左右、顶部、底部、或滚动到指定元素）',
+    inputSchema: obj({
+      direction: { type: 'string', enum: ['up', 'down', 'left', 'right', 'top', 'bottom', 'toElement'], description: '滚动方向，默认 down' },
+      distance: num('滚动像素距离，默认 500', 1, 10000),
+      selector: str('可选：滚动特定容器，或者当 direction=toElement 时要滚动至视口的元素选择器'),
+    }),
+  },
+  {
+    name: 'select-option',
+    group: 'browser',
+    description: '在下拉框（<select> 元素）中选择选项，按 value、文本或下标匹配',
+    inputSchema: obj(
+      {
+        selector: str('<select> 元素选择器'),
+        value: str('要选中的 option value 属性值'),
+        label: str('要选中的 option 可见文本'),
+        index: num('要选中的 option 索引（从 0 开始）', 0),
+      },
+      ['selector'],
+    ),
+  },
+  {
+    name: 'click-coordinate',
+    group: 'browser',
+    description: '直接向视口中的 (x, y) 坐标派发完整点击事件（适用于 Canvas、图表、无文本图标或复杂交互）',
+    inputSchema: obj(
+      {
+        x: num('水平坐标 X（像素）', 0),
+        y: num('垂直坐标 Y（像素）', 0),
+      },
+      ['x', 'y'],
+    ),
+  },
+  {
+    name: 'batch-actions',
+    group: 'browser',
+    description: '一次性批量串行执行多个页面动作（如 type -> wait -> press-key），大幅减少 MCP 往返延迟',
+    inputSchema: obj(
+      {
+        actions: {
+          type: 'array',
+          items: { type: 'object', description: '动作对象，需含 type（click/hover/type/clear/pressKey/scroll/selectOption/clickCoordinate/wait/waitFor/waitForText）' },
+          description: '按序执行的动作数组',
+        },
+        stopOnError: bool('遇到错误时是否立即停止，默认 true'),
+      },
+      ['actions'],
     ),
   },
   {
@@ -405,6 +509,42 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
       },
       ['selector'],
     ),
+  },
+  {
+    name: 'list-tabs',
+    group: 'browser',
+    description: '查看浏览器当前所有标签页（ID、标题、URL、是否当前受管页）',
+    inputSchema: obj({}),
+  },
+  {
+    name: 'switch-tab',
+    group: 'browser',
+    description: '切换受管标签页至指定 tabId，并前台激活该标签页',
+    inputSchema: obj({ tabId: num('标签页 ID') }, ['tabId']),
+  },
+  {
+    name: 'new-tab',
+    group: 'browser',
+    description: '打开新标签页并设为受管标签页',
+    inputSchema: obj({ url: str('目标网址 http(s)://') }, ['url']),
+  },
+  {
+    name: 'go-back',
+    group: 'browser',
+    description: '后退至上一页面',
+    inputSchema: obj({}),
+  },
+  {
+    name: 'go-forward',
+    group: 'browser',
+    description: '前进至下一页面',
+    inputSchema: obj({}),
+  },
+  {
+    name: 'reload-page',
+    group: 'browser',
+    description: '刷新当前受管标签页',
+    inputSchema: obj({ ignoreCache: bool('是否忽略缓存强制刷新，默认 false') }),
   },
   {
     name: 'close-tab',
@@ -456,8 +596,33 @@ export const JSON_RPC_ERRORS = {
   INTERNAL: -32603,
 } as const;
 
-/** 把 MCP 工具执行结果包装为 MCP tools/call 的标准 result */
+/** 把 MCP 工具执行结果包装为 MCP tools/call 的标准 result（支持多模态图片返回） */
 export function toolCallResult(data: unknown, isError = false): Record<string, unknown> {
+  const contents: Array<Record<string, unknown>> = [];
+
+  if (data && typeof data === 'object' && '__mcpImage' in (data as Record<string, unknown>)) {
+    const imgObj = (data as Record<string, unknown>).__mcpImage as { data: string; mimeType: string };
+    if (imgObj && typeof imgObj.data === 'string' && typeof imgObj.mimeType === 'string') {
+      contents.push({
+        type: 'image',
+        data: imgObj.data,
+        mimeType: imgObj.mimeType,
+      });
+    }
+
+    const cleanData = { ...(data as Record<string, unknown>) };
+    delete cleanData.__mcpImage;
+    delete cleanData.base64;
+    delete cleanData.dataUrl;
+
+    contents.push({
+      type: 'text',
+      text: JSON.stringify(cleanData, null, 2),
+    });
+
+    return { content: contents, isError };
+  }
+
   return {
     content: [{ type: 'text', text: JSON.stringify(data ?? {}, null, 2) }],
     isError,

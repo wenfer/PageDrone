@@ -169,11 +169,14 @@ MCP 客户端(stdio) ⇄ pagedrone-mcp 桥接进程(npx 启动, 本机)
 | `run-procedure` | exec | RUN_PROCEDURE → runProcedureStandalone | 独立标签页执行单个技能，返回 executionId |
 | `run-flow` | exec | flow-test.ts 隔离画布通道 | 后台打开隔离画布执行流程，返回 executionId |
 | `get-execution` / `abort-execution` | exec | GET_STATUS / STOP / abortStandaloneRun / EXPLORE_ABORT 同层 | 进度查询与取消（§6.3） |
-| `navigate` | browser | TabSession + goto step | 打开或复用受管标签页跳转 |
-| `read-page` | browser | samplePageState（密码框源头脱敏） | 读取 URL/标题/正文摘要/可交互元素及转义选择器 |
-| `click` / `type` / `wait` / `wait-for-text` / `wait-for-url` | browser | pageRunOneStep + explorer-exec 证据回灌 | 原子操作，返回 ok/confirmed 两级结果 |
+| `navigate` | browser | TabSession + goto step | 打开、复用或接管受管标签页跳转（支持 managed-new/managed-reuse/current-active） |
+| `read-page` | browser | samplePageState（密码框源头脱敏） | 读取状态：URL/标题/正文/可交互元素（含坐标、视口可见性、角色，支持 compact 极简文本树） |
+| `screenshot` | browser | captureVisibleTab | 捕获视口 Base64 截图并按 MCP image 原生返回，支持指定选择器元素坐标 |
+| `get-page-outline` | browser | samplePageOutline | 获取标题层级（H1-H6）、表单、主要导航链接与 Meta 元信息 |
+| `click` / `hover` / `type` / `clear-input` / `press-key` / `scroll-page` / `select-option` / `click-coordinate` | browser | execPageAction 注入 | 丰富的原子操作手势，返回 ok/confirmed 两级证据 |
+| `batch-actions` | browser | withBrowserLock 批量串行 | 批量流水线执行多个动作，大幅降低 MCP 往返耗时 |
 | `extract` | browser | pageExtractData | text/attribute/html/value/list/table 提取 |
-| `close-tab` | browser | TabSession 清理 | 关闭受管标签页 |
+| `list-tabs` / `switch-tab` / `new-tab` / `go-back` / `go-forward` / `reload-page` / `close-tab` | browser | chrome.tabs 原生 API | 完整的标签页调度与导航历史控制 |
 | `explore-and-create-procedure` | browser | EXPLORE_GENERATE → explorer.ts | LLM 探索归纳生成归属指定 siteId 的技能 |
 | `http-request` | exec | HTTP_REQUEST handler | 用户在请求体中显式给出的 HTTP 调用 |
 
