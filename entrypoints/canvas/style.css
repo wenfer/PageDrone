@@ -71,43 +71,43 @@ button, input, select, textarea { font: inherit; }
 .react-flow__attribution { display: none; }
 .canvas-hint { position: absolute; z-index: 4; bottom: 12px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); background: color-mix(in oklab, var(--card) 90%, transparent); box-shadow: var(--canvas-shadow-sm); backdrop-filter: blur(10px); font-size: 10px; }
 
-.flow-node { width: 194px; overflow: visible; border: 1px solid var(--border); border-radius: var(--radius); color: var(--card-foreground); background: var(--card); box-shadow: var(--canvas-shadow-sm); transition: border-color .15s, box-shadow .15s, transform .15s; }
-.flow-node.selected { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 20%, transparent), var(--canvas-shadow-sm); }
-.flow-node.run-running { border-color: var(--warning); box-shadow: 0 0 0 4px color-mix(in oklab, var(--warning) 18%, transparent), var(--canvas-shadow-sm); }
-.flow-node.run-done { border-color: var(--success); }
-.flow-node.run-failed { border-color: var(--destructive); box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 16%, transparent), var(--canvas-shadow-sm); }
-.flow-node.run-timeout { border-color: var(--warning); box-shadow: 0 0 0 4px color-mix(in oklab, var(--warning) 22%, transparent), var(--canvas-shadow-sm); }
-.flow-node.run-need_login { border-color: var(--destructive); box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 12%, transparent), var(--canvas-shadow-sm); }
+.flow-node { width: 196px; overflow: visible; border: 1.5px solid var(--border); border-radius: var(--radius); color: var(--card-foreground); background: var(--card); box-shadow: 0 4px 16px color-mix(in oklab, var(--foreground) 5%, transparent); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.flow-node.selected { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent), 0 8px 24px color-mix(in oklab, var(--primary) 15%, transparent); }
+.flow-node.run-running { border-color: var(--warning); box-shadow: 0 0 0 4px color-mix(in oklab, var(--warning) 24%, transparent), 0 8px 24px color-mix(in oklab, var(--warning) 16%, transparent); }
+.flow-node.run-done { border-color: var(--success); box-shadow: 0 0 0 3px color-mix(in oklab, var(--success) 22%, transparent); }
+.flow-node.run-failed { border-color: var(--destructive); box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 24%, transparent); }
+.flow-node.run-timeout { border-color: var(--warning); box-shadow: 0 0 0 4px color-mix(in oklab, var(--warning) 24%, transparent); }
+.flow-node.run-need_login { border-color: var(--destructive); box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 20%, transparent); }
 .flow-node.run-skipped { border-color: var(--muted-foreground); opacity: .68; }
 .flow-node.run-aborted { border-color: var(--muted-foreground); opacity: .72; }
-.flow-node-head { min-height: 38px; padding: 8px 10px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--border); border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0; background: var(--muted); }
+.flow-node-head { min-height: 38px; padding: 8px 10px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--border); border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0; background: var(--muted); }
 .flow-node-icon { width: 18px; color: var(--primary); text-align: center; font-weight: 800; }
 .flow-node-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
-.flow-node-head small { color: var(--muted-foreground); font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
-.flow-node-body { min-height: 41px; padding: 9px 10px; color: var(--card-foreground); font-size: 10px; }
+.flow-node-head small { color: var(--muted-foreground); font-size: 8.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.flow-node-body { min-height: 41px; padding: 9px 10px; color: var(--card-foreground); font-size: 10.5px; }
 .flow-node-body em { color: var(--muted-foreground); font-style: italic; }
 .node-summary-report { margin-top: 6px; color: var(--muted-foreground); font-size: 9px; }
 .node-summary-row { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; }
 .node-summary-row > span { flex: 0 0 32px; color: var(--muted-foreground); }
 .node-summary-row > strong { min-width: 0; flex: 1; font-weight: 500; word-break: break-all; }
-.flow-node-start { border-color: color-mix(in oklab, var(--success) 65%, var(--border)); }
-.flow-node-start .flow-node-head { color: var(--success); background: color-mix(in oklab, var(--success) 10%, var(--card)); }
-.flow-node-end { border-color: color-mix(in oklab, var(--destructive) 60%, var(--border)); }
-.flow-node-end .flow-node-head { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 9%, var(--card)); }
-.flow-node-condition, .flow-node-delay { border-color: color-mix(in oklab, var(--warning) 58%, var(--border)); }
-.flow-node-condition .flow-node-head, .flow-node-delay .flow-node-head { color: var(--warning); background: color-mix(in oklab, var(--warning) 10%, var(--card)); }
-.flow-node-loop { border-color: color-mix(in oklab, var(--accent-foreground) 45%, var(--border)); }
-.flow-node-loop .flow-node-head { color: var(--accent-foreground); background: var(--accent); }
-.flow-node-parallel, .flow-node-variable, .flow-node-log { border-color: color-mix(in oklab, var(--info) 55%, var(--border)); }
-.flow-node-parallel .flow-node-head, .flow-node-variable .flow-node-head, .flow-node-log .flow-node-head { color: var(--info); background: color-mix(in oklab, var(--info) 9%, var(--card)); }
-.flow-node-procedure, .flow-node-site { border-color: color-mix(in oklab, var(--primary) 52%, var(--border)); }
-.flow-node-procedure .flow-node-head, .flow-node-site .flow-node-head { color: var(--primary); background: color-mix(in oklab, var(--primary) 9%, var(--card)); }
+.flow-node-start { border-color: color-mix(in oklab, var(--success) 70%, var(--border)); }
+.flow-node-start .flow-node-head { color: #047857; background: #d1fae5; }
+.flow-node-end { border-color: color-mix(in oklab, var(--destructive) 70%, var(--border)); }
+.flow-node-end .flow-node-head { color: #b91c1c; background: #fee2e2; }
+.flow-node-condition, .flow-node-delay { border-color: color-mix(in oklab, var(--warning) 68%, var(--border)); }
+.flow-node-condition .flow-node-head, .flow-node-delay .flow-node-head { color: #b45309; background: #fef3c7; }
+.flow-node-loop { border-color: color-mix(in oklab, var(--accent-foreground) 60%, var(--border)); }
+.flow-node-loop .flow-node-head { color: #6b21a8; background: #f3e8ff; }
+.flow-node-parallel, .flow-node-variable, .flow-node-log { border-color: color-mix(in oklab, var(--info) 65%, var(--border)); }
+.flow-node-parallel .flow-node-head, .flow-node-variable .flow-node-head, .flow-node-log .flow-node-head { color: #0369a1; background: #e0f2fe; }
+.flow-node-procedure, .flow-node-site { border-color: color-mix(in oklab, var(--primary) 65%, var(--border)); }
+.flow-node-procedure .flow-node-head, .flow-node-site .flow-node-head { color: #4338ca; background: #e0e7ff; }
 .flow-node-request,
-.flow-node-http { border-color: color-mix(in oklab, var(--primary) 58%, var(--border)); }
+.flow-node-http { border-color: color-mix(in oklab, var(--primary) 70%, var(--border)); }
 .flow-node-request .flow-node-head,
-.flow-node-http .flow-node-head { color: var(--primary); background: color-mix(in oklab, var(--primary) 11%, var(--card)); }
-.flow-handle { width: 12px !important; height: 12px !important; border: 2px solid var(--muted-foreground) !important; background: var(--card) !important; }
-.flow-handle:hover, .flow-handle.connecting, .flow-handle.valid { border-color: var(--primary) !important; background: var(--primary) !important; }
+.flow-node-http .flow-node-head { color: #4338ca; background: #e0e7ff; }
+.flow-handle { width: 12px !important; height: 12px !important; border: 2px solid var(--primary) !important; background: var(--card) !important; }
+.flow-handle:hover, .flow-handle.connecting, .flow-handle.valid { border-color: var(--primary) !important; background: var(--primary) !important; box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 30%, transparent) !important; }
 
 .rightbar { width: 308px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
 .panel-tabs { flex: 0 0 48px; display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--border); background: var(--surface-raised); }

@@ -4,61 +4,86 @@
 
 :root {
   color-scheme: light;
-  --background: oklch(0.985 0.004 275);
-  --foreground: oklch(0.205 0.02 275);
+  /* 基础画布与前景 */
+  --background: oklch(0.985 0.005 260);
+  --foreground: oklch(0.18 0.025 265);
+  
+  /* 卡片与弹窗：纯白通透，高对比 */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.205 0.02 275);
+  --card-foreground: oklch(0.18 0.025 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.205 0.02 275);
-  --primary: oklch(0.56 0.225 276);
-  --primary-foreground: oklch(0.985 0.006 276);
-  --secondary: oklch(0.95 0.012 275);
-  --secondary-foreground: oklch(0.28 0.035 275);
-  --muted: oklch(0.955 0.008 275);
-  --muted-foreground: oklch(0.52 0.025 275);
-  --accent: oklch(0.93 0.035 276);
-  --accent-foreground: oklch(0.32 0.1 276);
-  --destructive: oklch(0.59 0.22 25);
-  --destructive-foreground: oklch(0.985 0.003 25);
-  --border: oklch(0.89 0.012 275);
-  --input: oklch(0.89 0.012 275);
-  --ring: oklch(0.62 0.2 276);
-  --surface: oklch(0.97 0.007 275);
+  --popover-foreground: oklch(0.18 0.025 265);
+  
+  /* 品牌主色：鲜明活力的 PageDrone Electric Indigo */
+  --primary: oklch(0.57 0.24 275);
+  --primary-foreground: oklch(0.99 0.003 275);
+  
+  /* 辅助与次级元素 */
+  --secondary: oklch(0.96 0.015 265);
+  --secondary-foreground: oklch(0.25 0.04 270);
+  
+  /* 静音色调与边框 */
+  --muted: oklch(0.955 0.01 265);
+  --muted-foreground: oklch(0.48 0.03 265);
+  
+  /* 强调色：梦幻紫蓝 */
+  --accent: oklch(0.94 0.04 280);
+  --accent-foreground: oklch(0.3 0.12 280);
+  
+  /* 状态色彩：鲜明、饱和度充足、高辨识度 */
+  --destructive: oklch(0.6 0.24 25);
+  --destructive-foreground: oklch(0.99 0.002 25);
+  --success: oklch(0.65 0.2 152);
+  --warning: oklch(0.76 0.18 75);
+  --info: oklch(0.64 0.19 245);
+  
+  /* 边框与光晕 */
+  --border: oklch(0.9 0.012 265);
+  --input: oklch(0.9 0.012 265);
+  --ring: oklch(0.62 0.22 275);
+  --surface: oklch(0.972 0.008 260);
   --surface-raised: oklch(1 0 0);
-  --success: oklch(0.62 0.17 151);
-  --warning: oklch(0.75 0.16 78);
-  --info: oklch(0.62 0.17 246);
-  --radius: 0.75rem;
-  --shadow-color: 265 35% 20%;
+  
+  --radius: 0.85rem;
+  --shadow-color: 250 45% 15%;
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.15 0.018 275);
-  --foreground: oklch(0.94 0.009 275);
-  --card: oklch(0.195 0.022 275);
-  --card-foreground: oklch(0.94 0.009 275);
-  --popover: oklch(0.205 0.024 275);
-  --popover-foreground: oklch(0.94 0.009 275);
-  --primary: oklch(0.7 0.18 276);
-  --primary-foreground: oklch(0.17 0.04 276);
-  --secondary: oklch(0.255 0.025 275);
-  --secondary-foreground: oklch(0.93 0.01 275);
-  --muted: oklch(0.245 0.02 275);
-  --muted-foreground: oklch(0.69 0.022 275);
-  --accent: oklch(0.29 0.055 276);
-  --accent-foreground: oklch(0.91 0.035 276);
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.985 0.003 25);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.72 0.16 276);
-  --surface: oklch(0.18 0.019 275);
-  --surface-raised: oklch(0.22 0.024 275);
-  --success: oklch(0.7 0.16 151);
-  --warning: oklch(0.8 0.15 78);
-  --info: oklch(0.72 0.15 246);
-  --shadow-color: 270 50% 2%;
+  /* 深空 OLED 紫黑琉璃质感 */
+  --background: oklch(0.13 0.02 270);
+  --foreground: oklch(0.96 0.008 260);
+  
+  --card: oklch(0.175 0.025 270);
+  --card-foreground: oklch(0.96 0.008 260);
+  --popover: oklch(0.19 0.028 270);
+  --popover-foreground: oklch(0.96 0.008 260);
+  
+  /* 霓虹发光主色 */
+  --primary: oklch(0.68 0.22 275);
+  --primary-foreground: oklch(0.12 0.04 275);
+  
+  --secondary: oklch(0.24 0.03 270);
+  --secondary-foreground: oklch(0.94 0.01 260);
+  
+  --muted: oklch(0.22 0.025 270);
+  --muted-foreground: oklch(0.68 0.025 265);
+  
+  --accent: oklch(0.28 0.06 280);
+  --accent-foreground: oklch(0.95 0.03 280);
+  
+  --destructive: oklch(0.66 0.22 25);
+  --destructive-foreground: oklch(0.99 0.002 25);
+  --success: oklch(0.72 0.18 152);
+  --warning: oklch(0.82 0.16 75);
+  --info: oklch(0.74 0.17 245);
+  
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.2 275);
+  --surface: oklch(0.16 0.022 270);
+  --surface-raised: oklch(0.2 0.028 270);
+  --shadow-color: 260 60% 3%;
 }
 
 @theme inline {
@@ -90,10 +115,10 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.05);
-  --shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.08), 0 1px 2px hsl(var(--shadow-color) / 0.05);
-  --shadow-md: 0 8px 24px hsl(var(--shadow-color) / 0.1), 0 2px 6px hsl(var(--shadow-color) / 0.06);
-  --shadow-lg: 0 18px 48px hsl(var(--shadow-color) / 0.14), 0 4px 12px hsl(var(--shadow-color) / 0.08);
+  --shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.04);
+  --shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.06), 0 1px 2px hsl(var(--shadow-color) / 0.04);
+  --shadow-md: 0 8px 24px hsl(var(--shadow-color) / 0.08), 0 2px 6px hsl(var(--shadow-color) / 0.04);
+  --shadow-lg: 0 18px 48px hsl(var(--shadow-color) / 0.12), 0 4px 12px hsl(var(--shadow-color) / 0.06);
 }
 
 @layer base {
@@ -110,7 +135,7 @@
     min-width: 320px;
     min-height: 100vh;
     margin: 0;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
