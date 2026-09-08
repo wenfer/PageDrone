@@ -5,43 +5,43 @@
 :root {
   color-scheme: light;
   /* 基础画布与前景 */
-  --background: oklch(0.985 0.005 260);
-  --foreground: oklch(0.18 0.025 265);
+  --background: oklch(0.984 0.004 265);
+  --foreground: oklch(0.2 0.018 265);
   
   /* 卡片与弹窗：纯白通透，高对比 */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.025 265);
+  --card-foreground: oklch(0.2 0.018 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.025 265);
+  --popover-foreground: oklch(0.2 0.018 265);
   
-  /* 品牌主色：鲜明活力的 PageDrone Electric Indigo */
-  --primary: oklch(0.57 0.24 275);
+  /* 品牌主色：沉稳的 PageDrone 靖蓝（低饱和，长时间阅读不刺眼） */
+  --primary: oklch(0.55 0.15 275);
   --primary-foreground: oklch(0.99 0.003 275);
   
   /* 辅助与次级元素 */
-  --secondary: oklch(0.96 0.015 265);
-  --secondary-foreground: oklch(0.25 0.04 270);
+  --secondary: oklch(0.962 0.008 265);
+  --secondary-foreground: oklch(0.28 0.028 270);
   
   /* 静音色调与边框 */
-  --muted: oklch(0.955 0.01 265);
-  --muted-foreground: oklch(0.48 0.03 265);
+  --muted: oklch(0.958 0.006 265);
+  --muted-foreground: oklch(0.5 0.02 265);
   
-  /* 强调色：梦幻紫蓝 */
-  --accent: oklch(0.94 0.04 280);
-  --accent-foreground: oklch(0.3 0.12 280);
+  /* 强调色：柔和紫蓝 */
+  --accent: oklch(0.945 0.024 278);
+  --accent-foreground: oklch(0.33 0.08 278);
   
-  /* 状态色彩：鲜明、饱和度充足、高辨识度 */
-  --destructive: oklch(0.6 0.24 25);
+  /* 状态色彩：中等饱和度，辨识度与舒适度平衡 */
+  --destructive: oklch(0.58 0.16 25);
   --destructive-foreground: oklch(0.99 0.002 25);
-  --success: oklch(0.65 0.2 152);
-  --warning: oklch(0.76 0.18 75);
-  --info: oklch(0.64 0.19 245);
+  --success: oklch(0.6 0.13 152);
+  --warning: oklch(0.72 0.12 75);
+  --info: oklch(0.6 0.12 245);
   
   /* 边框与光晕 */
-  --border: oklch(0.9 0.012 265);
-  --input: oklch(0.9 0.012 265);
-  --ring: oklch(0.62 0.22 275);
-  --surface: oklch(0.972 0.008 260);
+  --border: oklch(0.908 0.008 265);
+  --input: oklch(0.908 0.008 265);
+  --ring: oklch(0.58 0.14 275);
+  --surface: oklch(0.972 0.005 262);
   --surface-raised: oklch(1 0 0);
   
   --radius: 0.85rem;
@@ -50,39 +50,39 @@
 
 .dark {
   color-scheme: dark;
-  /* 深空 OLED 紫黑琉璃质感 */
-  --background: oklch(0.13 0.02 270);
-  --foreground: oklch(0.96 0.008 260);
+  /* 深空柔和紫黑，降低紫色倾向 */
+  --background: oklch(0.145 0.012 268);
+  --foreground: oklch(0.94 0.006 260);
   
-  --card: oklch(0.175 0.025 270);
-  --card-foreground: oklch(0.96 0.008 260);
-  --popover: oklch(0.19 0.028 270);
-  --popover-foreground: oklch(0.96 0.008 260);
+  --card: oklch(0.185 0.015 268);
+  --card-foreground: oklch(0.94 0.006 260);
+  --popover: oklch(0.2 0.017 268);
+  --popover-foreground: oklch(0.94 0.006 260);
   
-  /* 霓虹发光主色 */
-  --primary: oklch(0.68 0.22 275);
-  --primary-foreground: oklch(0.12 0.04 275);
+  /* 柔光主色 */
+  --primary: oklch(0.68 0.13 275);
+  --primary-foreground: oklch(0.13 0.025 275);
   
-  --secondary: oklch(0.24 0.03 270);
-  --secondary-foreground: oklch(0.94 0.01 260);
+  --secondary: oklch(0.245 0.02 268);
+  --secondary-foreground: oklch(0.93 0.006 260);
   
-  --muted: oklch(0.22 0.025 270);
-  --muted-foreground: oklch(0.68 0.025 265);
+  --muted: oklch(0.228 0.016 268);
+  --muted-foreground: oklch(0.68 0.015 265);
   
-  --accent: oklch(0.28 0.06 280);
-  --accent-foreground: oklch(0.95 0.03 280);
+  --accent: oklch(0.275 0.035 278);
+  --accent-foreground: oklch(0.94 0.02 278);
   
-  --destructive: oklch(0.66 0.22 25);
+  --destructive: oklch(0.65 0.15 25);
   --destructive-foreground: oklch(0.99 0.002 25);
-  --success: oklch(0.72 0.18 152);
-  --warning: oklch(0.82 0.16 75);
-  --info: oklch(0.74 0.17 245);
+  --success: oklch(0.7 0.13 152);
+  --warning: oklch(0.8 0.12 75);
+  --info: oklch(0.72 0.12 245);
   
-  --border: oklch(1 0 0 / 14%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.7 0.2 275);
-  --surface: oklch(0.16 0.022 270);
-  --surface-raised: oklch(0.2 0.028 270);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.12 275);
+  --surface: oklch(0.168 0.014 268);
+  --surface-raised: oklch(0.21 0.018 268);
   --shadow-color: 260 60% 3%;
 }
 
