@@ -14,7 +14,7 @@ import {
 import { convertV1Sites, normalizeProcedureSiteOwnership } from './v1-convert.js';
 import type { LoginDetect, Procedure, Site } from './models.js';
 
-const CURRENT_VERSION = 7;
+const CURRENT_VERSION = 8;
 
 export async function runMigrations(): Promise<void> {
   const v = await getSchemaVersion();
@@ -26,6 +26,7 @@ export async function runMigrations(): Promise<void> {
   if (v < 5) await migrateV4ToV5();
   if (v < 6) await migrateV5ToV6();
   if (v < 7) await migrateV6ToV7();
+  if (v < 8) await migrateV7ToV8();
 
   await setSchemaVersion(CURRENT_VERSION);
 }
@@ -40,6 +41,17 @@ async function migrateV4ToV5(): Promise<void> {
     return { ...procedure, output: { enabled: false, fields: [] } };
   });
   if (changed) await saveProcedures(next);
+}
+
+/** MCP 服务已移除：清掉本地残留的配置、会话、审计、确认与作业状态。 */
+async function migrateV7ToV8(): Promise<void> {
+  await chrome.storage.local.remove([
+    'mcpConfig',
+    'mcpSessionState',
+    'mcpAuditLog',
+    'mcpPendingConfirms',
+    'mcpExecutions',
+  ]);
 }
 
 /**

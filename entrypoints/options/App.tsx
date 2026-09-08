@@ -12,7 +12,6 @@ import {
   FileJson2,
   Globe2,
   ListChecks,
-  Plug,
   SearchX,
   ScrollText,
   Settings2,
@@ -52,9 +51,7 @@ import { exportAll, importSites } from '../../src/lib/storage.js';
 import { compareVersions, type MarketItem } from '../../src/lib/market.js';
 import type { ChatTurn, ExploreProgressEvent, InterventionContext, RecordingPreview, RuntimeState } from '../../src/lib/types.js';
 import { AiChatPanel } from './components/ai-chat/AiChatPanel';
-import { McpPanel } from './components/McpPanel';
-
-type Tab = 'overview' | 'sites' | 'procedures' | 'market' | 'flows' | 'logs' | 'agent' | 'data' | 'mcp' | 'settings';
+type Tab = 'overview' | 'sites' | 'procedures' | 'market' | 'flows' | 'logs' | 'agent' | 'data' | 'settings';
 
 type ServiceResponse<T = Record<string, unknown>> = T & { ok: boolean; error?: string };
 type StatusPayload = {
@@ -77,7 +74,6 @@ const NAV: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
   { id: 'flows', label: '流程', hint: '画布编排', icon: Workflow },
   { id: 'logs', label: '日志', hint: '执行记录', icon: ScrollText },
   { id: 'agent', label: 'AI 对话', hint: '自然语言操作', icon: Bot },
-  { id: 'mcp', label: 'MCP 服务', hint: '外部 agent 接入', icon: Plug },
   { id: 'data', label: '导入 / 导出', hint: '备份与迁移', icon: DatabaseBackup },
   { id: 'settings', label: '设置', hint: '全局与 AI', icon: Settings2 },
 ];
@@ -300,7 +296,6 @@ export default function App() {
           {!state.loading && tab === 'flows' ? <FlowsPanel flows={state.flows} notify={notify} /> : null}
           {!state.loading && tab === 'logs' ? <LogsPanel logs={state.logs} tasks={state.tasks} notify={notify} /> : null}
           {!state.loading && tab === 'agent' ? <AiChatPanel settings={state.settings} runtime={state.runtime} notify={notify} onThinkingModeChange={(enabled) => void updateAgentThinkingMode(enabled)} onOpenSettings={() => setTab('settings')} onOpenEntity={openAiEntity} /> : null}
-          {!state.loading && tab === 'mcp' ? <McpPanel notify={notify} /> : null}
           {!state.loading && tab === 'data' ? <DataTransferPanel notify={notify} /> : null}
           {!state.loading && tab === 'settings' ? <SettingsPanel settings={state.settings} applySettings={state.applySettings} notify={notify} /> : null}
         </div>

@@ -21,7 +21,6 @@ auto-checkin/                      # 仓库目录名保持不变（品牌名为 
 │   │   ├── index.html · main.tsx
 │   │   ├── App.tsx               # 响应式设置页、技能/站点/市场/日志/录制
 │   │   ├── components/ai-chat/   # AI 对话、会话历史、消息与 AI 工具结果组件
-│   │   ├── McpPanel.tsx          # 「MCP 服务」面板（开关/令牌/授权模式/域名白名单/确认/审计）
 │   │   └── styles.css
 │   └── canvas/                   # React Flow 流程画布，构建为 canvas.html
 │       ├── index.html · main.tsx · App.tsx
@@ -41,11 +40,7 @@ auto-checkin/                      # 仓库目录名保持不变（品牌名为 
 │   │   ├── cf.ts · market.ts · messaging.ts · migrate.ts · v1-convert.ts
 │   │   ├── tab-session.ts · cancellation.ts · errors.ts
 │   │   ├── flow-test.ts         # 通过隔离画布复用正式流程引擎执行 AI 流程诊断
-│   │   ├── http-request.ts      # SW 内发起显式配置 HTTP 请求（画布节点与 MCP 工具共享）
-│   │   ├── mcp/                    # MCP 服务：外部 agent 经本地桥接接入（见 docs/mcp-requirements.md）
-│   │   │   ├── config.ts · audit.ts · errors.ts · confirms.ts
-│   │   │   ├── protocol.ts · executions.ts · browser.ts
-│   │   │   └── tools.ts · session.ts
+│   │   ├── http-request.ts      # SW 内发起显式配置 HTTP 请求（画布「发送请求」节点用）
 │   │   └── page/                 # chrome.scripting 注入的自包含函数
 │   │       ├── steps.ts · selectors.ts · collector.ts · user-script.ts
 │   │       └── explorer-sample.ts · explorer-exec.ts · extract.ts · outline.ts
@@ -53,10 +48,7 @@ auto-checkin/                      # 仓库目录名保持不变（品牌名为 
 │   ├── canvas/                   # 迁移对照用旧画布，不进入 WXT 页面入口
 │   ├── styles/                   # 迁移对照用旧样式
 │   └── icons/                    # 迁移对照用旧图标
-├── docs/                         # 设计与需求文档（mcp-requirements.md 等）
-├── mcp-bridge/                   # 独立 npm 包：本地 MCP 桥接进程（npx pagedrone-mcp，stdio ⇄ WebSocket）
-│   ├── index.js · package.json
-│   └── README.md
+├── docs/                         # 设计与需求文档
 ├── market/                       # 示例市场源（index.json + procedures/*.json）
 ├── fixtures/                     # 本地演示页
 ├── scripts/
@@ -128,7 +120,6 @@ auto-checkin/                      # 仓库目录名保持不变（品牌名为 
 | `AGENT_CHAT_SEND/ABORT/RESET/HISTORY` | UI → SW | 按会话发送、停止、清空与读取 AI 对话 |
 | `AGENT_CHAT_CREATE/DELETE` | UI → SW | 新建与删除本地持久化的 AI 对话会话 |
 | `INTERVENTION_RESOLVE` | UI → SW | 执行偏差自愈决策 |
-| `MCP_GET_STATE / SET_CONFIG / RESOLVE_CONFIRM / CLEAR_AUDIT` | UI → SW | 「MCP 服务」面板：读取状态与审计、保存配置（含轮换令牌、重连/断开）、裁决 write/域名确认、清空审计 |
 | `RECORD_START/STOP/STEP_REMOVE/DISCARD` | UI → SW / Content | 人工示范录制；保存时必须携带目标 `siteId` |
 | `RECORD_EVENT` | Content → SW | 采集器事件上报（字面量，不走 MSG 常量） |
 
@@ -200,16 +191,6 @@ AI 工具目录由 `renderSkillCatalog()` 从 `SKILLS` 表自动生成 prompt，
 
 `Procedure.kind='verification'` 表示用户可复用的验证技能。技能通过 `siteId` 归属于网站，站点通过 `verificationProcedureId` 选择默认验证技能；`RunContext.waitForChallengeClear` 检测到防护页后先短暂等待自动放行，仍未通过时执行该技能。验证技能可以包含等待、跳转、页面操作和 `manual` 人工确认，但不得内置验证码破解或安全策略绕过。完成状态由 `VerificationDetect.completedSelector`、`completedUrlIncludes` 或通用防护页消失信号确认。画布的 `procedure` 节点必须先选择网站，再选择该网站下的技能，UI 名称为“调用技能”。
 
-### 4.6 MCP 服务（外部 Agent 接入）
-
-管理页「MCP 服务」面板让外部 AI Agent（Claude Desktop、Cursor 等）经标准 MCP 协议操控本扩展。架构为方案 A（见 `docs/mcp-requirements.md`）：扩展 SW 出站 WebSocket 连接本地桥接进程 `mcp-bridge/`（npx pagedrone-mcp，stdio ⇄ WS），心跳 20s 保活 + `mcp-keepalive` 周期闹钟兜底 + 指数退避重连。
-
-- **模块职责**：`src/lib/mcp/config.ts` 配置与会话状态持久化（存储键 `mcpConfig` / `mcpSessionState`）；`src/lib/mcp/session.ts` WS 连接与 JSON-RPC 分发；`src/lib/mcp/protocol.ts` 工具清单（read/write/browser/exec 四组约 38 个）；`src/lib/mcp/tools.ts` 权限分级 + 确认门禁 + 审计 + 复用业务内核；`src/lib/mcp/executions.ts` run-* 异步作业（executionId + 长轮询 + 取消，键 `mcpExecutions`）；`src/lib/mcp/browser.ts` 受管标签页原子操作；`src/lib/mcp/confirms.ts` write/新域名用户确认（内存槽位 + 存储镜像 `mcpPendingConfirms`）；`src/lib/mcp/audit.ts` 审计环形缓冲（`mcpAuditLog`，2000 条）。
-- **安全铁律**：总开关默认关闭；配对令牌仅存本地、可轮换；桥接主机白名单默认仅回环；只读/标准/完全三级授权（standard 的 write 组逐次弹窗确认，可“本会话内记住”）；browser 组访问未配置站点的新域名需用户确认，黑名单硬拒；非 http(s) 目标（chrome:// 等内部页）一律拒绝；禁止向密码字段写入。
-- **复用内核**：read/write 组工具直接走 `agent-skills.executeSkill`；exec 组走 `enqueueSites` / `runProcedureStandalone` / `runFlowTest` / `http-request.ts::performHttpRequest`；browser 组注入 `src/lib/page/*` 并返回 ok+confirmed 两级语义。禁止在 mcp/ 内复制一份业务逻辑。
-
----
-
 ## 5. 自学习能力声明（Self-Learning Capability）
 
 > **本项目声明具备"自学习能力"（Self-Learning Capability）**。此处的"自学习"不是训练权重，而是指——**扩展在与用户和目标网站的交互过程中，持续吸收结构化经验、迭代内置知识，无需修改代码即可提升未来执行的成功率与鲁棒性**。具体体现在以下六个维度：
@@ -270,7 +251,7 @@ python scripts/build_crx.py   # 需 private.pem，产出 .crx
 - **唯一事实源**：版本号只存在于根 `package.json` 的 `version` 字段。MV3 manifest 由 WXT 构建时自动读取该字段生成，**禁止手改** `.output/chrome-mv3/manifest.json` 等构建产物。
 - **语义化版本（SemVer）**：
   - **MAJOR**：破坏性变更——存储结构不兼容、移除既有功能或改变用户数据格式（必须配套 `src/lib/migrate.ts` 迁移评估）。
-  - **MINOR**：新增功能——如新增 MCP 服务、新画布节点类型等向后兼容的能力。
+  - **MINOR**：新增功能——如新增画布节点类型等向后兼容的能力。
   - **PATCH**：缺陷修复、文案与品牌调整、依赖补丁等不改变功能面的改动。
 - **发版流程**：改 `package.json` version → commit → `git tag vX.Y.Z` → `git push`（含 tags）→ CI 自动构建 zip/crx 并创建 GitHub Release。
 - **一致性硬约束**：tag 必须与 `package.json` version 严格一致（`v1.3.0` ↔ `"version": "1.3.0"`）；打 tag 前必须本地跑通 `npm run typecheck && npm run build`，零错误才允许发版。
@@ -310,7 +291,6 @@ python scripts/build_crx.py   # 需 private.pem，产出 .crx
 | AI 测试技能 | AI 对话测试/修复指令 | `test-procedure` → `runProcedureStandalone(diagnostic)` → `RunContext.observePage` → 页面观察回流 → 写入工具修复并重测 |
 | AI 测试流程 | AI 对话测试/修复指令 | `test-flow` → `flow-test.ts` → 隔离 `canvas.html` → `executeFlow` → `FLOW_TEST_PROGRESS/RESULT` |
 | AI 探索生成 | 技能编辑器探索按钮 | `EXPLORE_GENERATE` → `exploreAndGenerate`（`explorer.ts`）；点击产生子标签页时接管新页继续探索 |
-| MCP 外部接入 | 桥接进程 `npx pagedrone-mcp` → SW 出站 WS | `initMcp`（SW 启动）→ `src/lib/mcp/session.ts` 心跳/重连 → `src/lib/mcp/tools.ts::handleMcpToolCall` → 复用 executeSkill / 队列 / 独立技能运行 / 流程测试；run-* 经 `src/lib/mcp/executions.ts` 异步作业 |
 | 人工示范录制 | 录制按钮 | `RECORD_START` → `RecordingSession` → `RECORD_EVENT` 采集 |
 | 市场安装 | 设置页市场标签 | `MARKET_INSTALL` → `installFromMarket`（`market.ts`） |
 | 数据迁移 | SW 启动 `bootstrap` | `runMigrations`（`migrate.ts`） |

@@ -1,6 +1,6 @@
 /**
  * 在 Service Worker 中发起用户/调用方显式配置的 HTTP 请求。
- * 由 MSG.HTTP_REQUEST（画布「发送请求」节点）与 MCP `http-request` 工具共享。
+ * 由 MSG.HTTP_REQUEST（画布「发送请求」节点）触发。
  */
 
 export async function performHttpRequest(options: {
